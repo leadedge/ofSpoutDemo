@@ -1,0 +1,124 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\ofApp.cpp" />
+    <ClCompile Include="src\Addons\ofxSkybox\ofxCubeMap.cpp">
+      <Filter>Addons\ofxSkyBox</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Addons\ofxSkybox\ofxSkyBox.cpp">
+      <Filter>Addons\ofxSkyBox</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Addons\ofxWinMenu\ofxWinMenu.cpp">
+      <Filter>Addons\ofxWinMenu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutCopy.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutDirectX.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutFrameCount.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutGLDXinterop.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutGLextensions.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutMemoryShare.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutReceiver.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutSDK.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutSender.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutSenderNames.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutSharedMemory.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\SpoutSDK\SpoutUtils.cpp">
+      <Filter>SpoutSDK</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\ofApp.h" />
+    <ClInclude Include="src\resource.h" />
+    <ClInclude Include="src\Addons\ofxSkybox\ofxCubeMap.h">
+      <Filter>Addons\ofxSkyBox</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Addons\ofxSkybox\ofxSkyBox.h">
+      <Filter>Addons\ofxSkyBox</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Addons\ofxWinMenu\ofxWinMenu.h">
+      <Filter>Addons\ofxWinMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\Spout.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutCommon.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutCopy.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutDirectX.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutFrameCount.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutGLDXinterop.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutGLextensions.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutMemoryShare.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutReceiver.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutSDK.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutSender.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutSenderNames.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutSharedMemory.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\SpoutSDK\SpoutUtils.h">
+      <Filter>SpoutSDK</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="SpoutSDK">
+      <UniqueIdentifier>{40684720-d5f5-4b90-bdcb-c8ae275b33ec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Addons">
+      <UniqueIdentifier>{1ba6d4f0-46d5-4837-8350-fd95d7ce763e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Addons\ofxWinMenu">
+      <UniqueIdentifier>{c2fe0e93-6a2e-41f2-8470-a43497690336}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Addons\ofxSkyBox">
+      <UniqueIdentifier>{2b64db67-52ec-43b5-8bab-21d39db6ed92}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="src\resource.rc" />
+  </ItemGroup>
+</Project>
