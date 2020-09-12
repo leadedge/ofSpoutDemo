@@ -8,7 +8,10 @@
 
 	Copyright (C) 2020 Lynn Jarvis.
 
-	Uses modified source of the ofxSkybox addon
+	This program can be used to test Spout development code.
+	It requires the files from the Spout SDK "develop" branch as detailed below.
+
+	Uses the ofxSkybox addon
 	https://github.com/kalwalt/ofxSkyBox
     Created by kalwalt alias Walter Perdan on 27/12/11
 	Copyright 2011 http://www.kalwaltart.it/ All rights reserved.
@@ -16,9 +19,7 @@
 	Uses the ofxWinMenu addon
 	https://github.com/leadedge/ofxWinMenu
 
-	This program can be used to test Spout development code.
-	It requires the files from the Spout SDK "develop" branch.
-		
+	The source for both of these is modified and included with the project.
 
     Setup required for For Visual Studio 2017 and Openframeworks 11.
 
@@ -36,13 +37,13 @@
 
     You will then have a folder structure as follows :
 
-    ..\OPENFRAMEWORKS11
+    OPENFRAMEWORKS11
         addons
         examples
         apps
             SpoutSDK <- the Spout SDK source files
             myApps
-               emptyExample
+               emptyExample <- Openframeworks example template
 			   ofSpoutDemo <- the ofSpoutDemo project folder
 			       ofSpoutDemo.sln
 			       ofSpoutDemo.vcxproj
@@ -59,20 +60,24 @@
 
     Open "ofSpoutDemo.sln" with Visual Studio 2017 and set to "Release"
 
-	The first time you use Openframeworks you have to cimpile the library
+	The first time you use Openframeworks you have to compile the library
 	RH click on "openframeworksLib" - Build
-	
-	when it is compiled :
-	
+		when it is compiled :
 	RH click on "ofSpoutDemo" - Build
-	ofSpoutDemo.exe will be in the "bin" folder
+		ofSpoutDemo.exe will be in the "bin" folder
+	Rename it as required. For example : ofSpoutSender.exe or ofSpoutReceiver.exe
 
-	Build options
+	Build options :
 
 	You can build the project either as a sender or receiver
 	Find in ofApp.h :
 		// Change to create a sender or a receiver
 		// #define BUILDRECEIVER
+
+	Modifications :
+
+	The code may contain experimental functions which are not documented
+	As many comments as possible are included in the source files.
 
 
 	=========================================================================
@@ -739,6 +744,7 @@ void ofApp::SelectAdapter()
 			if (!receiver.SetAdapter(currentadapter)) {
 				MessageBoxA(NULL, "Could not select graphics adapter", "Error", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
 				currentadapter = oldadapter;
+				receiver.SetAdapter(currentadapter);
 			}
 		}
 #else
@@ -749,10 +755,11 @@ void ofApp::SelectAdapter()
 			if (!sender.SetAdapter(currentadapter)) {
 				MessageBoxA(NULL, "Could not select graphics adapter", "Error", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
 				currentadapter = oldadapter;
+				sender.SetAdapter(currentadapter);
 			}
 		}
-	}
 #endif
+	}
 
 }
 
@@ -806,7 +813,6 @@ INT_PTR  CALLBACK AdapterProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
 		default:
 			return (INT_PTR)FALSE;
 		}
-		break;
 	}
 
 	return (INT_PTR)FALSE;
