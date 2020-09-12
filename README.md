@@ -1,8 +1,9 @@
 # ofSpoutDemo
 Spout OpenFrameworks Demo program
 
-This program can be used to test Spout development code.\
-It requires the files from the Spout SDK "develop" branch as detailed below.
+Please note that this program is designed to test Spout development code and is not the same as the demo programs provided with the Spout distribution. Nevertheless it could also be useful for other purposes.
+
+The project requires the files from the Spout SDK "develop" branch as detailed below.
 
 Uses the [ofxSkybox](https://github.com/kalwalt/ofxSkyBox) addon\
 Created by kalwalt alias Walter Perdan
