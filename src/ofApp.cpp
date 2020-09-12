@@ -692,8 +692,8 @@ void ofApp::SelectAdapter()
 	adaptername->clear();
 
 	#ifdef BUILDRECEIVER
-		shareMode = receiver.GetShareMode(); // Make sure the user-selected mode is up to date
-		sender.SetShareMode(shareMode);
+		shareMode = receiver.GetShareMode(); // Make sure the user-selected share mode is up to date
+		receiver.SetShareMode(shareMode);
 		currentadapter = receiver.GetAdapter();
 		oldadapter = currentadapter; // to test for change
 		adaptercount = receiver.GetNumAdapters();
@@ -702,7 +702,7 @@ void ofApp::SelectAdapter()
 			adaptername[i] = name;
 		}
 	#else
-		shareMode = sender.GetShareMode(); // Make sure the user-selected mode is up to date
+		shareMode = sender.GetShareMode(); // Make sure the user-selected share mode is up to date
 		sender.SetShareMode(shareMode);
 		currentadapter = sender.GetAdapter();
 		oldadapter = currentadapter; // to test for change
