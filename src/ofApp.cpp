@@ -121,7 +121,7 @@ void ofApp::setup(){
 #endif
 	ofSetWindowTitle(senderName); // show it on the title bar
 	
-	// OpenSpoutConsole(); // Empty console for debugging
+	OpenSpoutConsole(); // Empty console for debugging
 	// EnableSpoutLog(); // Log to console
 	// EnableSpoutLogFile(senderName); // Log to file
 
@@ -692,6 +692,8 @@ void ofApp::SelectAdapter()
 	adaptername->clear();
 
 	#ifdef BUILDRECEIVER
+		shareMode = receiver.GetShareMode(); // Make sure the user-selected mode is up to date
+		sender.SetShareMode(shareMode);
 		currentadapter = receiver.GetAdapter();
 		oldadapter = currentadapter; // to test for change
 		adaptercount = receiver.GetNumAdapters();
@@ -700,6 +702,8 @@ void ofApp::SelectAdapter()
 			adaptername[i] = name;
 		}
 	#else
+		shareMode = sender.GetShareMode(); // Make sure the user-selected mode is up to date
+		sender.SetShareMode(shareMode);
 		currentadapter = sender.GetAdapter();
 		oldadapter = currentadapter; // to test for change
 		adaptercount = sender.GetNumAdapters();
