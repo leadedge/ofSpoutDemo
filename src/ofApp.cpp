@@ -163,7 +163,6 @@ void ofApp::setup(){
 	// "File" popup menu
 	//
 	HMENU hPopup = menu->AddPopupMenu(g_hMenu, "File");
-	// TODO : menu->AddPopupItem(hPopup, "Sender Name", false, false);
 	menu->AddPopupItem(hPopup, "Graphics Adapter", false, false);
 	// Final File popup menu item is "Exit" - add a separator before it
 	menu->AddPopupSeparator(hPopup);
@@ -187,7 +186,6 @@ void ofApp::setup(){
 	//
 	hPopup = menu->AddPopupMenu(g_hMenu, "Help");
 	menu->AddPopupItem(hPopup, "About", false, false); // No auto check
-	// TODO : diagnostics, documentation
 	
 	// Adjust window to desired client size allowing for the menu
 	RECT rect;
@@ -522,15 +520,9 @@ void ofApp::windowResized(int w, int h)
 // 
 void ofApp::appMenuFunction(string title, bool bChecked) {
 
-	// TODO : fill out
-
 	//
 	// File menu
 	//
-
-	if (title == "Sender Name") {
-		// 
-	}
 
 	if (title == "Graphics Adapter") {
 		SelectAdapter();
@@ -588,17 +580,6 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 		DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_ABOUTBOX), g_hWnd, About);
 	}
 
-	/*
-	if (title == "Documentation") {
-		char path[MAX_PATH];
-		HMODULE hModule = GetModuleHandle(NULL);
-		GetModuleFileNameA(hModule, path, MAX_PATH);
-		PathRemoveFileSpecA(path);
-		strcat_s(path, MAX_PATH, "\\SpoutLink.pdf");
-		ShellExecuteA(g_hWnd, "open", path, NULL, NULL, SW_SHOWNORMAL);
-	}
-	*/
-
 } // end appMenuFunction
 
 
@@ -620,8 +601,7 @@ void ofApp::doFullScreen(bool bFullscreen)
 			}
 			g_hwndTopmost = GetNextWindow(g_hwndTopmost, GW_HWNDNEXT);
 			GetWindowTextA(g_hwndTopmost, (LPSTR)tmp, 256);
-		} while (g_hwndTopmost != NULL);
-		// g_hwndTopmost is NULL if GetNextWindow finds no more windows
+		} while (g_hwndTopmost != NULL); // g_hwndTopmost is NULL if GetNextWindow finds no more windows
 
 		// Get the client/window adjustment values
 		GetWindowRect(g_hWnd, &windowRect);
@@ -721,21 +701,19 @@ void ofApp::SelectAdapter()
 		}
 	#else
 		currentadapter = sender.GetAdapter();
-		// oldadapter = currentadapter; // to test for change
+		oldadapter = currentadapter; // to test for change
 		adaptercount = sender.GetNumAdapters();
 		for (int i = 0; i < adaptercount; i++) {
 			sender.GetAdapterName(i, name, 64);
 			adaptername[i] = name;
 		}
 	#endif
-	// printf("SelectAdapter() : currentadapter = %d : oldadapter = %d\n", currentadapter, oldadapter);
 
 	// Show the dialog box 
 	retvalue = (int)DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_ADAPTERBOX), g_hWnd, (DLGPROC)AdapterProc);
-	// OK (1) - a new adapter index (currentadapter) has been selected
-
-	// printf("retvalue = %d : currentadapter = %d : oldadapter = %d\n", retvalue, currentadapter, oldadapter);
+	
 	if (retvalue != 0) {
+		// OK (1) - a new adapter index (currentadapter) has been selected
 #ifdef BUILDRECEIVER
 		// A new sender will be detected on the first ReceiveTexture call (Requires 2.007)
 		receiver.ReleaseReceiver();
@@ -834,7 +812,6 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	case WM_INITDIALOG:
 
-		// TODO : use windowtitle
 		sprintf_s(about, 256, "Spout demo program - Version ");
 		// Get product version number
 		if (GetModuleFileNameA(hInstance, tmp, MAX_PATH)) {
