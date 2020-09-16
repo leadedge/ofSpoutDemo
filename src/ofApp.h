@@ -28,7 +28,7 @@
 #include "resource.h"
 
 // Change to create a sender or a receiver
-// #define BUILDRECEIVER
+#define BUILDRECEIVER
 
 class ofApp : public ofBaseApp{
 	public:
@@ -96,7 +96,6 @@ class ofApp : public ofBaseApp{
 		ofTrueTypeFont myFont;
 		ofxWinMenu * menu;
 		ofxSkyBox skybox;
-		ofVec3f sphereCenter;
 		ofEasyCam easycam;
 
 };
