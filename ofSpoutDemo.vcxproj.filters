@@ -48,6 +48,9 @@
     <ClCompile Include="..\..\SpoutSDK\SpoutUtils.cpp">
       <Filter>SpoutSDK</Filter>
     </ClCompile>
+    <ClCompile Include="src\Nvapi\SpoutOptimus.cpp">
+      <Filter>Nvapi</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ofApp.h" />
@@ -103,6 +106,9 @@
     <ClInclude Include="..\..\SpoutSDK\SpoutUtils.h">
       <Filter>SpoutSDK</Filter>
     </ClInclude>
+    <ClInclude Include="src\Nvapi\SpoutOptimus.h">
+      <Filter>Nvapi</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="SpoutSDK">
@@ -116,6 +122,9 @@
     </Filter>
     <Filter Include="Addons\ofxSkyBox">
       <UniqueIdentifier>{2b64db67-52ec-43b5-8bab-21d39db6ed92}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Nvapi">
+      <UniqueIdentifier>{1e5a2c81-64ff-4871-80bf-1f2cf85de730}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

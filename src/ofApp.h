@@ -24,12 +24,11 @@
 #include "..\apps\SpoutSDK\Spout.h"
 #include "Addons\ofxSkybox\ofxSkyBox.h" // Skybox addon
 #include "Addons\ofxWinMenu\ofxWinMenu.h" // Windows menu addon
+#include "Nvapi\SpoutOptimus.h" // NVIDIA profile settings
 #include "resource.h"
 
 // Change to create a sender or a receiver
 // #define BUILDRECEIVER
-
-
 
 class ofApp : public ofBaseApp{
 	public:
@@ -47,7 +46,6 @@ class ofApp : public ofBaseApp{
 #else
 		SpoutSender sender;
 #endif
-
 		bool bInitialized = false; // TODO
 		char senderName[256];  // Sender name
 		unsigned int senderWidth; // Dimensions of the sender can be independent
@@ -59,12 +57,9 @@ class ofApp : public ofBaseApp{
 		ofFbo myFbo;           // For texture sharing
 		float rotX, rotY;
 
-		// ==========================
 		bool bTopmost;
 		bool bFullScreen;
 		bool bShowInfo;
-
-		HWND g_hWnd;// global handle to the OpenGL render window
 
 		// These are all for restoring from full screen
 		RECT windowRect; // Window rectangle
@@ -77,12 +72,29 @@ class ofApp : public ofBaseApp{
 		HMENU g_hMenu; // Original menu
 		DWORD g_dwStyle; // Original style
 		
-		ofTrueTypeFont myFont;
-		ofxWinMenu * menu;
 		void appMenuFunction(string title, bool bChecked);
 		void doFullScreen(bool bFullscreen);
+		bool EnterSenderName(char *SenderName);
 		void SelectAdapter();
 
+		// for diagnostics
+		nVidia g_NvApi;
+		bool DoDiagnostics();
+		bool GLDXready(bool bDX9);
+		bool CheckForDirectX9c();
+		void trim(char* s);
+
+		int g_ThreadedOptimization = 0;
+		bool bLaptop = false; // NVAPI detection of a laptop
+		bool bIntegrated = false; // Laptop using integrated GPU
+		int NvidiaMode = -1; // Optimus graphics mode
+		unsigned int NvidiaDriverVersion = 0; // Driver Version
+		char NvidiaBuildBranchString[128];
+		unsigned int DriverPrimary = 0;
+		unsigned int DriverSecondary = 0;
+
+		ofTrueTypeFont myFont;
+		ofxWinMenu * menu;
 		ofxSkyBox skybox;
 		ofVec3f sphereCenter;
 		ofEasyCam easycam;

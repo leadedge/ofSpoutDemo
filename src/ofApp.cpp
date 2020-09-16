@@ -99,20 +99,32 @@
 #include "resource.h"
 
 // DIALOGS
+
+INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam); // enter a sender name 
+static PSTR szText;
+
 INT_PTR  CALLBACK AdapterProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 static std::string adaptername[10];
 static int adaptercount = 0;
 static int currentadapter = 0;
+static int selectedadapter = 0;
 
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
-static int spoutVersion = 2004;
+static int spoutVersion = 0;
 static HINSTANCE g_hInstance;
+static HWND g_hWnd;
 
+// Diagnostics
+
+INT_PTR CALLBACK Capabilities(HWND, UINT, WPARAM, LPARAM);
+static char gldxcaps[1024]; // capability info
+static char capsText[1024]; // For dialog
+static bool bCopyClipboard = false;
 
 //--------------------------------------------------------------
 void ofApp::setup(){
 
-	ofBackground(10, 100, 140);
+	ofBackground(0, 0, 0);
 
 #ifdef BUILDRECEIVER
 	strcpy_s(senderName, 256, "Spout Receiver");
@@ -121,7 +133,7 @@ void ofApp::setup(){
 #endif
 	ofSetWindowTitle(senderName); // show it on the title bar
 	
-	OpenSpoutConsole(); // Empty console for debugging
+	// OpenSpoutConsole(); // Empty console for debugging
 	// EnableSpoutLog(); // Log to console
 	// EnableSpoutLogFile(senderName); // Log to file
 
@@ -146,6 +158,17 @@ void ofApp::setup(){
 	// Disable escape key exit
 	ofSetEscapeQuitsApp(false);
 
+	// For diagmostics
+	g_ThreadedOptimization = 0;
+	bLaptop = false; // NVAPI detection of a laptop
+	bIntegrated = false; // Laptop using integrated GPU
+	NvidiaMode = -1; // Optimus graphics mode
+	NvidiaDriverVersion = 0; // Driver Version
+	NvidiaBuildBranchString[128];
+	DriverPrimary = 0;
+	DriverSecondary = 0;
+	bCopyClipboard = false;
+
 	//
 	// Create a menu using ofxWinMenu
 	//
@@ -163,6 +186,9 @@ void ofApp::setup(){
 	// "File" popup menu
 	//
 	HMENU hPopup = menu->AddPopupMenu(g_hMenu, "File");
+#ifndef BUILDRECEIVER
+	menu->AddPopupItem(hPopup, "Sender name", false, false);
+#endif
 	menu->AddPopupItem(hPopup, "Graphics Adapter", false, false);
 	// Final File popup menu item is "Exit" - add a separator before it
 	menu->AddPopupSeparator(hPopup);
@@ -185,6 +211,7 @@ void ofApp::setup(){
 	// "Help" popup
 	//
 	hPopup = menu->AddPopupMenu(g_hMenu, "Help");
+	menu->AddPopupItem(hPopup, "Diagnostics", false, false); // No auto check
 	menu->AddPopupItem(hPopup, "About", false, false); // No auto check
 	
 	// Adjust window to desired client size allowing for the menu
@@ -196,7 +223,7 @@ void ofApp::setup(){
 	SetWindowPos(g_hWnd, HWND_TOP,
 		(ofGetScreenWidth() - (rect.right - rect.left)) / 2,
 		(ofGetScreenHeight() - (rect.bottom - rect.top)) / 2,
-		(rect.right - rect.left), (rect.bottom - rect.top),	SWP_SHOWWINDOW);
+		(rect.right - rect.left), (rect.bottom - rect.top), SWP_NOREDRAW);
 
 	// Set the menu to the window
 	menu->SetWindowMenu();
@@ -245,7 +272,7 @@ void ofApp::setup(){
 
 	// Skybox setup
 	skybox.load();
-	
+
 	// Use ofEasyCam for mouse control instead of ofCamera
 	easycam.setPosition(ofVec3f(0, 0, 0));
 
@@ -289,7 +316,7 @@ void ofApp::update() {
 //--------------------------------------------------------------
 void ofApp::draw() {
 
-	ofBackground(10, 100, 140);
+	ofBackground(0, 0, 0);
 
 #ifdef BUILDRECEIVER
 
@@ -330,6 +357,11 @@ void ofApp::draw() {
 			myFont.drawString("No sender detected", 10, 30);
 		}
 
+		// Graphics adapter details
+		//    o	Adapter name
+		//    o User selected sharing mode
+		//    o Compatibility sharing mode
+
 		// The current graphics adapter name
 		str = adaptername[currentadapter];
 
@@ -339,8 +371,10 @@ void ofApp::draw() {
 		else
 			str += " : User share mode ";
 
-		// Get the current sharing mode (changes with graphics compatibility for Auto share mode)
-		// (GetMemoryShareMode reads the user registry setting instead)
+		// Get the current sharing mode using GetMemoryShare().
+		// This changes with graphics compatibility for Auto share mode
+		// compared to GetMemoryShareMode() and GetShareMode() 
+		// which read the user-selected mode from the registry
 		if (receiver.GetMemoryShare())
 			str += "(Memory)";
 		else
@@ -352,15 +386,13 @@ void ofApp::draw() {
 
 #else
 
-	ofClear(0, 0, 0, 0);
-
 	// - - - - - - - - - - - - - - - - 
 
 	// Draw 3D graphics into the fbo
 	myFbo.begin();
 
 	// Clear to reset the background and depth buffer
-	ofClear(0, 0, 0);
+	ofClear(0, 0, 0, 255);
 
 	// Draw the skybox
 	easycam.begin();
@@ -435,16 +467,14 @@ void ofApp::draw() {
 				break;
 			default :
 				str += " : Auto share mode ";
-				
-				//
-				// Get the current sharing mode using GetMemoryShare()
-				// This changes according to graphics compatibility for Auto share mode
-				// GetMemoryShareMode() and GetShareMode() read user-selected mode from the registry
-				//
+				// Get the current sharing mode using GetMemoryShare().
+				// This changes with graphics compatibility for Auto share mode
+				// compared to GetMemoryShareMode() and GetShareMode() 
+				// which read the user-selected mode from the registry
 				if (sender.GetMemoryShare())
-					str += " : Memory";
+					str += " (Memory)";
 				else
-					str += " : Texture";
+					str += " (Texture)";
 				break;
 		}
 
@@ -456,8 +486,10 @@ void ofApp::draw() {
 
 } // end Draw
 
+
 //--------------------------------------------------------------
 void ofApp::exit() {
+
 	// Close the sender or receiver on exit
 #ifdef BUILDRECEIVER
 	receiver.ReleaseReceiver();
@@ -470,18 +502,24 @@ void ofApp::exit() {
 //--------------------------------------------------------------
 void ofApp::mousePressed(int x, int y, int button) {
 
+	UNREFERENCED_PARAMETER(x);
+	UNREFERENCED_PARAMETER(y);
+
 #ifdef BUILDRECEIVER
 	if (button == 2) { // rh button
 		// Open the sender selection panel
 		// Spout must have been installed
 		receiver.SelectSender();
 	}
+#else
+	UNREFERENCED_PARAMETER(button);
 #endif
 
 }
 
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key) {
+
 #ifdef BUILDRECEIVER
 	if (key == OF_KEY_ESC) {
 		if (bFullScreen) {
@@ -494,9 +532,12 @@ void ofApp::keyPressed(int key) {
 		bFullScreen = !bFullScreen;
 		doFullScreen(bFullScreen);
 	}
+#else
+	UNREFERENCED_PARAMETER(key);
 #endif
 
 }
+
 //--------------------------------------------------------------
 void ofApp::windowResized(int w, int h) 
 {
@@ -523,6 +564,23 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	//
 	// File menu
 	//
+
+#ifndef BUILDRECEIVER
+	if (title == "Sender name") {
+		char sendername[256];
+		strcpy_s(sendername, senderName);
+		if (EnterSenderName(sendername)) {
+			if (strcmp(sendername, senderName) != 0) {
+				// Release the current sender and start again
+				strcpy_s(senderName, 256, sendername);
+				sender.ReleaseSender();
+				sender.CreateSender(senderName, senderWidth, senderHeight);
+				// Get the name in case of multiple numbered names of the same sender
+				sender.spout.GetActiveSender(senderName);
+			}
+		}
+	}
+#endif
 
 	if (title == "Graphics Adapter") {
 		SelectAdapter();
@@ -570,11 +628,11 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	//
 	// Help menu
 	//
-	if (title == "Information") {
-		string text = "Spout demo program\n";
-		MessageBoxA(NULL, text.c_str(), "Information", MB_OK | MB_TOPMOST);
-	}
 
+	if (title == "Diagnostics") {
+		DoDiagnostics();
+		DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_CAPSBOX), g_hWnd, Capabilities);
+	}
 
 	if (title == "About") {
 		DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_ABOUTBOX), g_hWnd, About);
@@ -679,34 +737,98 @@ void ofApp::doFullScreen(bool bFullscreen)
 }
 
 
+bool ofApp::EnterSenderName(char *SenderName)
+{
+	int retvalue = 0;
+	unsigned char textin[256];
+
+	strcpy_s(szText = (PSTR)textin, 256, SenderName); // move to a static string for the dialog
+
+	// Show the dialog box 
+	retvalue = (int)DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_NAMEBOX), g_hWnd, (DLGPROC)UserSenderName);
+
+	// OK - sender name has been entered
+	if (retvalue != 0) {
+		strcpy_s(SenderName, 256, szText); // Return the entered name
+		return true;
+	}
+
+	// Cancel
+	return false;
+
+}
+
+// Message handler for sender name entry for a sender
+INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+
+	switch (message) {
+
+	case WM_INITDIALOG:
+		// Fill text entry box with passed string
+		SetDlgItemTextA(hDlg, IDC_NAMETEXT, szText);
+		// Select all text in the edit field
+		SendDlgItemMessage(hDlg, IDC_NAMETEXT, EM_SETSEL, 0, 0x7FFF0000L);
+		return (INT_PTR)TRUE;
+
+	case WM_COMMAND:
+		switch (LOWORD(wParam)) {
+		case IDOK:
+			// Get contents of edit field into static 256 char string
+			GetDlgItemTextA(hDlg, IDC_NAMETEXT, szText, 256);
+			EndDialog(hDlg, 1);
+			break;
+		case IDCANCEL:
+			// User pressed cancel.  Just take down dialog box.
+			EndDialog(hDlg, 0);
+			return (INT_PTR)TRUE;
+		default:
+			return (INT_PTR)FALSE;
+		}
+		break;
+	}
+
+	return (INT_PTR)FALSE;
+}
+
+
 
 void ofApp::SelectAdapter()
 {
 	char name[64];
-	int retvalue = -1;
-	bool bRet = false;
-	int oldmode = 0;
+	int retvalue = 0;
 
-	// Save the old adapter index
-	int oldadapter = currentadapter;
-	adaptername->clear();
+	// OpenGL/DirectX interop compatibility is unknown for the selected adapter unless tested.
+	// Either use Memory share to bypass the test or Auto share mode to switch if necessary.
+#ifdef BUILDRECEIVER
+	shareMode = receiver.GetShareMode(); // User selected share mode
+#else
+	shareMode = sender.GetShareMode(); // User selected share mode
+#endif
+	if (shareMode == 0) {
+		MessageBoxA(NULL, "Auto share mode required to change adapter", "Error", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
+		return;
+	}
 
 	#ifdef BUILDRECEIVER
-		shareMode = receiver.GetShareMode(); // Make sure the user-selected share mode is up to date
-		receiver.SetShareMode(shareMode);
-		currentadapter = receiver.GetAdapter();
-		oldadapter = currentadapter; // to test for change
+		receiver.SetShareMode(shareMode); // Update the share mode flags
+		currentadapter = receiver.GetAdapter(); // Get the current adapter index
+		selectedadapter = currentadapter; // The index to be selected in the dialog
+		// Create a name list for the dialog
 		adaptercount = receiver.GetNumAdapters();
+		adaptername->clear();
 		for (int i = 0; i < adaptercount; i++) {
 			receiver.GetAdapterName(i, name, 64);
 			adaptername[i] = name;
 		}
 	#else
-		shareMode = sender.GetShareMode(); // Make sure the user-selected share mode is up to date
-		sender.SetShareMode(shareMode);
-		currentadapter = sender.GetAdapter();
-		oldadapter = currentadapter; // to test for change
+		sender.SetShareMode(shareMode); // Update the share mode flags
+		currentadapter = sender.GetAdapter(); // Get the current adapter index
+		selectedadapter = currentadapter; // The index to be selected in the dialog
+		// Create a name list for the dialog
 		adaptercount = sender.GetNumAdapters();
+		adaptername->clear();
 		for (int i = 0; i < adaptercount; i++) {
 			sender.GetAdapterName(i, name, 64);
 			adaptername[i] = name;
@@ -717,27 +839,36 @@ void ofApp::SelectAdapter()
 	retvalue = (int)DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_ADAPTERBOX), g_hWnd, (DLGPROC)AdapterProc);
 	
 	if (retvalue != 0) {
-		// OK (1) - a new adapter index (currentadapter) has been selected
+		// OK - adapter index (selectedadapter) has been selected
 #ifdef BUILDRECEIVER
-		// A new sender will be detected on the first ReceiveTexture call (Requires 2.007)
-		receiver.ReleaseReceiver();
 		// Set the selected adapter if different
-		if (currentadapter != oldadapter) {
+		if (selectedadapter != currentadapter) {
 			if (!receiver.SetAdapter(currentadapter)) {
-				MessageBoxA(NULL, "Could not select graphics adapter", "Error", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-				currentadapter = oldadapter;
-				receiver.SetAdapter(currentadapter);
+				// SetAdapter returns to the primary adapter for failure
+				// GL/DX interop compatibility is also tested for Texture or Auto share modes
+				MessageBoxA(NULL, "Could not select graphics adapter", "SpoutDemo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
+			}
+			else {
+				// Change the application current adapter index to the one selected
+				currentadapter = selectedadapter;
+				// A new sender will be detected on the first ReceiveTexture call (Requires 2.007)
+				receiver.ReleaseReceiver();
 			}
 		}
 #else
-		// A new sender will be created on the first SendTexture call (Requires 2.007)
-		sender.ReleaseSender();
 		// Set the selected adapter if different
-		if (currentadapter != oldadapter) {
-			if (!sender.SetAdapter(currentadapter)) {
-				MessageBoxA(NULL, "Could not select graphics adapter", "Error", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-				currentadapter = oldadapter;
-				sender.SetAdapter(currentadapter);
+		if (selectedadapter != currentadapter) {
+			if (!sender.SetAdapter(selectedadapter)) {
+				// SetAdapter returns to the primary adapter for failure
+				// GL/DX interop compatibility is also tested for Texture or Auto share modes
+				MessageBoxA(NULL, "Could not select graphics adapter", "SpoutDemo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
+			}
+			else {
+				// Change the application current adapter index to the one selected
+				currentadapter = selectedadapter;
+				// A new sender using the selected adapter will be created
+				// on the first SendTexture call (Requires 2.007)
+				sender.ReleaseSender();
 			}
 		}
 #endif
@@ -753,11 +884,11 @@ INT_PTR  CALLBACK AdapterProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
 	HWND hwndList = NULL;
 	int i = 0;
 	char name[128];
-	int old = currentadapter;
 
 	switch (message) {
 
 	case WM_INITDIALOG:
+
 		// Adapter combo selection
 		hwndList = GetDlgItem(hDlg, IDC_ADAPTERS);
 		if (adaptercount < 10) {
@@ -774,21 +905,22 @@ INT_PTR  CALLBACK AdapterProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
 
 		// Combo box selection
 		if (HIWORD(wParam) == CBN_SELCHANGE) {
-			currentadapter = (int)SendMessageA((HWND)lParam, (UINT)CB_GETCURSEL, (WPARAM)0, (LPARAM)0);
+			selectedadapter = (int)SendMessageA((HWND)lParam, (UINT)CB_GETCURSEL, (WPARAM)0, (LPARAM)0);
 		}
 		// Drop through
 
 		switch (LOWORD(wParam)) {
 
 		case IDOK:
-			// Keep the adapter index selection
+			// Return the selected adapter index
+			// selectedadapter = (int)SendMessageA(hwndList, (UINT)CB_GETCURSEL, (WPARAM)0, (LPARAM)0);
 			EndDialog(hDlg, 1);
 			break;
 
 		case IDCANCEL:
 			// User pressed cancel.
-			// Set the adapter index back to what it was and take down dialog box.
-			currentadapter = old;
+			// Reset the selected index and take down dialog box.
+			selectedadapter = currentadapter;
 			EndDialog(hDlg, 0);
 			return (INT_PTR)TRUE;
 
@@ -805,8 +937,10 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
 	char tmp[MAX_PATH];
+	char fname[MAX_PATH];
 	char about[1024];
-	DWORD dummy, dwSize;
+	DWORD dummy, dwSize, dwVersion = 0;
+
 	LPDRAWITEMSTRUCT lpdis;
 	HWND hwnd = NULL;
 	HCURSOR cursorHand = NULL;
@@ -816,7 +950,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	case WM_INITDIALOG:
 
-		sprintf_s(about, 256, "Spout demo program - Version ");
+		sprintf_s(about, 256, "Spout demo program\r\n       Version ");
 		// Get product version number
 		if (GetModuleFileNameA(hInstance, tmp, MAX_PATH)) {
 			dwSize = GetFileVersionInfoSizeA(tmp, &dummy);
@@ -826,23 +960,47 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					LPVOID pvProductVersion = NULL;
 					unsigned int iProductVersionLen = 0;
 					if (VerQueryValueA(&data[0], ("\\StringFileInfo\\080904E4\\ProductVersion"), &pvProductVersion, &iProductVersionLen)) {
-						sprintf_s(tmp, MAX_PATH, "%s\n", (char *)pvProductVersion);
+						sprintf_s(tmp, MAX_PATH, "%s\r\n", (char *)pvProductVersion);
 						strcat_s(about, 1024, tmp);
 					}
 				}
 			}
 		}
-		strcat_s(about, 1024, "\n\n");
+		// strcat_s(about, 1024, "\r\n");
+
+		// Get the Spout version
+		spoutVersion = 0;
+		if (ReadDwordFromRegistry(HKEY_CURRENT_USER, "Software\\Leading Edge\\Spout", "Version", &dwVersion))
+			spoutVersion = (int)dwVersion; // 0 for earlier than 2.005
+
+		if (spoutVersion > 0) {
+			sprintf_s(tmp, 256, "Spout 2.00%1d", (spoutVersion - 2000));
+			strcat_s(about, 1024, tmp);
+			// Check Spout installation
+			if (ReadPathFromRegistry(HKEY_CURRENT_USER, "Software\\Leading Edge\\SpoutPanel", "InstallPath", fname)) {
+				// Does the SpoutPanel path have "Program Files" in it ?
+				if (strstr(fname, "Program Files"))
+					sprintf_s(tmp, 256, " installed\r\n");
+				else
+					sprintf_s(tmp, 256, " portable\r\n");
+				strcat_s(about, 1024, tmp);
+			}
+			else {
+				strcat_s(about, 1024, "\r\n");
+			}
+		}
+		else {
+			sprintf_s(tmp, 256, "Spout 2.004 or earlier\r\n");
+			strcat_s(about, 1024, tmp);
+		}
+
 		SetDlgItemTextA(hDlg, IDC_ABOUT_TEXT, (LPCSTR)about);
 
-		//
 		// Hyperlink hand cursor
-		//
 		cursorHand = LoadCursor(NULL, IDC_HAND);
 		hwnd = GetDlgItem(hDlg, IDC_SPOUT_URL);
 		SetClassLongA(hwnd, GCLP_HCURSOR, (long)cursorHand);
 		break;
-
 
 	case WM_DRAWITEM:
 
@@ -866,7 +1024,465 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			EndDialog(hDlg, LOWORD(wParam));
 			return (INT_PTR)TRUE;
 		}
+
 		break;
 	}
 	return (INT_PTR)FALSE;
+}
+
+// 
+// Diagnostics
+//
+
+// Message handler for caps dialog
+INT_PTR CALLBACK Capabilities(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	// Copied from SpoutSettings
+	UNREFERENCED_PARAMETER(lParam);
+	HCURSOR cursorHand = NULL;
+	LPDRAWITEMSTRUCT lpdis;
+	char tmp[MAX_PATH];
+
+	switch (message) {
+
+	case WM_INITDIALOG:
+
+		// Diagnostics text
+		SetDlgItemTextA(hDlg, IDC_CAPSTEXT, (LPCSTR)gldxcaps);
+
+		// Hyperlink hand cursor
+		cursorHand = LoadCursor(NULL, IDC_HAND);
+		SetClassLongPtrA(GetDlgItem(hDlg, IDC_SPOUT_URL), GCLP_HCURSOR, (LONG_PTR)cursorHand);
+
+		return (INT_PTR)TRUE;
+
+	case WM_DRAWITEM:
+
+		// The blue hyperlinks
+		lpdis = (LPDRAWITEMSTRUCT)lParam;
+		if (lpdis->itemID == -1) break;
+		SetTextColor(lpdis->hDC, RGB(6, 69, 173));
+		switch (lpdis->CtlID) {
+		case IDC_SPOUT_URL:
+			DrawTextA(lpdis->hDC, "https://spout.zeal.co", -1, &lpdis->rcItem, DT_LEFT);
+			break;
+		default:
+			break;
+		}
+		break;
+
+	case WM_COMMAND:
+
+		switch (LOWORD(wParam)) {
+
+		case IDC_SPOUT_URL:
+			sprintf_s(tmp, MAX_PATH, "http://spout.zeal.co");
+			ShellExecuteA(hDlg, "open", tmp, NULL, NULL, SW_SHOWNORMAL);
+			EndDialog(hDlg, 0);
+			return (INT_PTR)TRUE;
+
+		case IDOK:
+		case IDCANCEL:
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+
+		case IDC_LOG:
+			ShowSpoutLogs();
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+
+		case IDC_COPY:
+		{
+			// Crash on repeat for some reason
+			if (!bCopyClipboard && gldxcaps[0] && strlen(gldxcaps) > 16) {
+				if (OpenClipboard(g_hWnd)) {
+					HGLOBAL clipbuffer = NULL;
+					char* buffer = nullptr;
+					EmptyClipboard();
+					clipbuffer = GlobalAlloc(GMEM_DDESHARE, strlen(gldxcaps) + 1);
+					if (clipbuffer) {
+						buffer = (char*)GlobalLock(clipbuffer);
+						strcpy_s(buffer, strlen(gldxcaps) + 1, LPCSTR(gldxcaps));
+						GlobalUnlock(clipbuffer);
+						SetClipboardData(CF_TEXT, clipbuffer); // ??? crash here on repeat
+						MessageBoxA(hDlg, "Diagnostics copied to the clipboard.", "Spout Demo", MB_OK);
+						GlobalFree(clipbuffer);
+						bCopyClipboard = true;
+					}
+					CloseClipboard();
+				}
+				else {
+					MessageBoxA(hDlg, "Unknown clipboard open error.", "Spout Demo", MB_OK);
+				}
+			}
+			else {
+				MessageBoxA(hDlg, "Diagnostics copied to the clipboard.", "Spout Demo", MB_OK);
+			}
+			return (INT_PTR)TRUE;
+		}
+
+		default:
+			return (INT_PTR)FALSE;
+
+		} // end switch (LOWORD(wParam))
+	}
+
+	return (INT_PTR)FALSE;
+}
+
+bool ofApp::DoDiagnostics()
+{
+
+	SpoutLogNotice("Spout Demo Program : DoDiagnostics");
+
+	// Copied from SpoutSettings
+	bool bMemory = false;
+	bool bDX9 = false;
+	bool bDX9available = false;
+	bool bDX11available = false;
+
+	Spout *spout = new Spout; // local (no diagnostics are initially performed)
+
+	gldxcaps[0] = 0; // for repeats
+	sprintf_s(gldxcaps, 1024, "Spout Demo Program\r\n");
+
+	//
+	// Check DirectX
+	//
+
+	// Check for DirectX 9.0c
+	if (CheckForDirectX9c()) {
+		strcat_s(gldxcaps, 1024, "DirectX 9c installed\r\n");
+		// DirectX 9 installed - try to open a DX9 device
+		bDX9available = spout->interop.OpenDirectX(g_hWnd, true);
+		if (!bDX9available) {
+			strcat_s(gldxcaps, 1024, "Warning : DirectX 9 device not available\r\n");
+			bDX9 = false;
+		}
+		else {
+			spout->interop.CleanupDX9();
+			strcat_s(gldxcaps, 1024, "DirectX 9 device available\r\n");
+		}
+		// Try to open a DX11 device
+		bDX11available = spout->interop.OpenDirectX(g_hWnd, false);
+		if (!bDX11available) {
+			strcat_s(gldxcaps, 1024, "Warning : DirectX 11 device not available\r\n");
+		}
+		else {
+			spout->interop.CleanupDX11();
+			strcat_s(gldxcaps, 1024, "DirectX 11 device available\r\n");
+		}
+	}
+	else {
+		strcat_s(gldxcaps, 1024, "DirectX 9.0c not installed\r\n");
+		strcat_s(gldxcaps, 1024, "DirectX 9 device not available\r\n");
+		bDX9 = false;
+		bDX11available = spout->interop.OpenDirectX(NULL, false);
+		if (!bDX11available) {
+			strcat_s(gldxcaps, 1024, "DirectX 11 device not available\r\n");
+		}
+		else {
+			spout->interop.CleanupDX11();
+			strcat_s(gldxcaps, 1024, "DirectX 11 device available\r\n");
+		}
+	}
+
+	// Check the vendor of the primary GPU currently in use
+	strcat_s(gldxcaps, 1024, "Primary adapter : ");
+	strcat_s(gldxcaps, 1024, (char *)glGetString(GL_VENDOR));
+	strcat_s(gldxcaps, 1024, "\r\n");
+
+	// Find the primary adapter details using DirectX and Windows functions
+	char adapter[256]; adapter[0] = 0;;
+	char display[256]; display[0] = 0;
+	spout->interop.spoutdx.GetAdapterInfo(adapter, display, 256);
+
+	//
+	// Add the driver desc to the caps text
+	//
+
+	// The display adapter
+	if (display) trim(display);
+	if (display[0]) {
+		strcat_s(gldxcaps, 1024, display);
+		strcat_s(gldxcaps, 1024, " (Display) : ");
+		strcat_s(gldxcaps, 1024, "\r\n");
+	}
+
+	// Secondary adapter
+	if (adapter) trim(adapter);
+	if (adapter[0]) {
+		trim(adapter);
+		if (strcmp(adapter, display) != 0) {
+			strcat_s(gldxcaps, 1024, adapter);
+			strcat_s(gldxcaps, 1024, " (Secondary)");
+			strcat_s(gldxcaps, 1024, "\r\n");
+		}
+	}
+
+	// Check for Laptop using NVAPI
+	bIntegrated = false;
+	if (g_NvApi.IsLaptop(&bIntegrated)) {
+		strcat_s(gldxcaps, 1024, "Laptop system detected\r\n");
+		if (bIntegrated) {
+			// Get the current Optimus NVIDIA setting from the NVIDIA base profile
+			// This will just fail for unsupported hardware and return -1
+			// 0 - nvidia : 1 - integrated : 2 - auto-select, -1 fail
+			NvidiaMode = g_NvApi.GetNVIDIA(&NvidiaDriverVersion, NvidiaBuildBranchString);
+			if (NvidiaMode >= 0) {
+				if (NvidiaMode == 0)
+					strcat_s(gldxcaps, 1024, "Optimus using NVIDIA processor\r\n");
+				if (NvidiaMode == 1)
+					strcat_s(gldxcaps, 1024, "Optimus using Integrated processor\r\n");
+				if (NvidiaMode == 2)
+					strcat_s(gldxcaps, 1024, "Optimus Auto-select processor\r\n");
+			}
+		}
+	}
+	else {
+		strcat_s(gldxcaps, 1024, "Desktop system detected\r\n");
+	}
+
+	// Check for user set memoryshare mode first (> vers 2.005)
+	// Will always return false for 2.004 apps.
+	bMemory = spout->GetMemoryShareMode();
+
+	// Compatibilty check
+	// DirectX is OK but check for availabilty of the GL/DX extensions.
+	// The NV_DX_interop extensions will fail if the graphics driver does not support them
+	if (bDX11available || bDX9available) {
+		if (wglGetProcAddress("wglDXOpenDeviceNV")) { // extensions can be loaded
+			strcat_s(gldxcaps, 1024, "NV_DX_interop extensions available\r\n");
+			// Now actually load the extensions
+			if (!spout->interop.LoadGLextensions()) {
+				strcat_s(gldxcaps, 1024, "OpenGL extensions failed to load\r\n");
+				strcat_s(gldxcaps, 1024, "Graphics not texture share compatible\r\n");
+			}
+			else {
+				// It is possible that extensions load OK but that the GL/DX interop functions fail.
+				// This has been noted on dual graphics machines with the NVIDIA Optimus driver.
+				// If the compatibility test fails, fall back to memoryshare
+				// Check OpenGL GL/DX extension functions
+				// and create an interop device for success
+				if (bDX11available) {
+					// Create a DX11 device again
+					if (spout->interop.OpenDirectX11()) {
+						if (!spout->interop.GLDXready()) {
+							strcat_s(gldxcaps, 1024, "Warning : OpenGL/DX11 texture sharing failed\r\n");
+						}
+						else {
+							strcat_s(gldxcaps, 1024, "OpenGL/DX11 texture sharing succeeded\r\n");
+						}
+						spout->interop.CleanupDX11();
+					}
+					else {
+						strcat_s(gldxcaps, 1024, "DX11 initialization failed\r\n");
+					}
+				}
+				else if (bDX9available) {
+					// Create a DX9 device again
+					if (spout->interop.OpenDirectX9(g_hWnd)) {
+						if (!GLDXready(true)) {
+							strcat_s(gldxcaps, 1024, "Warning : OpenGL/DX9 texture sharing failed\r\n");
+						}
+						else {
+							strcat_s(gldxcaps, 1024, "OpenGL/DX9 texture sharing suceeded\r\n");
+						}
+						spout->interop.CleanupDX9();
+					}
+				}
+
+				bDX9 = spout->GetDX9(); // DX9 or DX11
+				bMemory = spout->interop.GetMemoryShare(); // Auto share mode
+				strcat_s(gldxcaps, 1024, "Compatibility");
+				if (bMemory)
+					strcat_s(gldxcaps, 1024, " - Memory share\r\n");
+				else {
+					if (bDX9)
+						strcat_s(gldxcaps, 1024, " - Texture (DirectX 9)\r\n");
+					else
+						strcat_s(gldxcaps, 1024, " - Texture (DirectX 11)\r\n");
+				}
+
+			} // loaded extensions OK
+		}
+		else {
+			// The extensions required for texture access are not available.
+			strcat_s(gldxcaps, 1024, "NV_DX_interop extensions not supported\r\n");
+			strcat_s(gldxcaps, 1024, "Graphics not texture share compatible\r\n");
+		}
+	}
+
+	delete spout;
+
+	return true;
+}
+
+
+//
+// Test whether the NVIDIA OpenGL/DirectX interop extensions function correctly. 
+// Creates dummy textures and uses the interop functions.
+// Creates an interop device on success.
+// Must be called after OpenDirectX.
+// Failure means fall back to Memoryshare mode
+// Success means the GLDX interop functions can be used.
+// Other errors should not happen if OpenDirectX succeeded
+bool ofApp::GLDXready(bool bDX9)
+{
+	HANDLE dxShareHandle = NULL; // Shared texture handle
+	LPDIRECT3DTEXTURE9  dxTexture = nullptr; // shared DX9 texture
+	ID3D11Texture2D* pSharedTexture = nullptr; // shared DX11 texture
+	HANDLE hInteropObject = NULL; // handle to the DX/GL interop object
+	GLuint glTexture = 0; // OpenGL texture linked to the shared DX texture
+
+	Spout spout;
+
+	// Create an opengl texture for the test
+	glGenTextures(1, &glTexture);
+	if (glTexture == 0) {
+		MessageBoxA(NULL, "GLDXReady - glGenTextures failed", "Spout demo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
+		return false;
+	}
+
+	SpoutLogNotice("SpoutDemo::GLDXready - testing GL/DX interop functions");
+
+	//
+	// Create a directX texture and link using the NVIDIA GLDX interop functions
+	//
+	if (bDX9) {
+
+		if (spout.interop.m_pDevice == NULL) {
+			glDeleteTextures(1, &glTexture);
+			MessageBoxA(NULL, "GLDXready (DX9) - No D3D9ex device", "SpoutSettings", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
+			SpoutLogError("SpoutDemo::GLDXready (DX9) - No D3D9ex device");
+			return false;
+		}
+
+		SpoutLogNotice("    Creating test DX9 texture");
+
+		// Create a shared DirectX9 texture for the test
+		dxShareHandle = NULL;
+		if (!spout.interop.spoutdx.CreateSharedDX9Texture(spout.interop.m_pDevice,
+			256, 256,
+			D3DFMT_A8R8G8B8, // default
+			dxTexture, dxShareHandle)) {
+			glDeleteTextures(1, &glTexture);
+			MessageBoxA(NULL, "GLDXready (DX9) - CreateSharedDX9Texture failed", "SpoutSettings", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
+			SpoutLogError("SpoutDemo::GLDXready (DX9) - CreateSharedDX9Texture failed");
+			return false;
+		}
+
+		SpoutLogNotice("    Linking test DX9 texture (0x%Ix)", dxTexture);
+
+		// Link the shared DirectX9 texture to the OpenGL texture
+		// If sucessful, LinkGLDXtextures initializes a class handle
+		// to a GL/DirectX interop device - m_hInteropDevice
+		hInteropObject = spout.interop.LinkGLDXtextures(spout.interop.m_pDevice, dxTexture, dxShareHandle, glTexture);
+		if (hInteropObject == NULL) {
+			SpoutLogError("SpoutDemo::GLDXready (DX9) - LinkGLDXtextures failed");
+			dxTexture->Release();
+			glDeleteTextures(1, &glTexture);
+			return false;
+		}
+		SpoutLogNotice("    Test DX9 texture created and linked OK");
+
+		if (spout.interop.m_hInteropDevice && hInteropObject) {
+			wglDXUnregisterObjectNV(spout.interop.m_hInteropDevice, hInteropObject);
+			if (!wglDXCloseDeviceNV(spout.interop.m_hInteropDevice)) {
+				SpoutLogWarning("SpoutDemo::GLDXReady - DX9 could not close interop");
+			}
+			spout.interop.m_hInteropDevice = NULL;
+		}
+		if (dxTexture)
+			dxTexture->Release();
+		if (glTexture)
+			glDeleteTextures(1, &glTexture);
+
+	} // endif DX9
+	else {
+		SpoutLogNotice("    Creating test DX11 texture");
+		// Create a new shared DirectX resource
+		dxShareHandle = NULL;
+		if (!spout.interop.spoutdx.CreateSharedDX11Texture(spout.interop.m_pd3dDevice,
+			256, 256,
+			DXGI_FORMAT_B8G8R8A8_UNORM, // default
+			&pSharedTexture,
+			dxShareHandle)) {
+			glDeleteTextures(1, &glTexture);
+			SpoutLogError("SpoutDemo::GLDXready (DX11) - CreateSharedDX11Texture failed");
+			return false;
+		}
+
+		SpoutLogNotice("    Linking test DX11 texture (0x%Ix) OpenGL texture (%2d)", pSharedTexture, glTexture);
+
+		// Link the shared DirectX texture to the OpenGL texture
+		// If sucessful, LinkGLDXtextures initializes a class handle
+		// to a GL/DirectX interop device - m_hInteropDevice
+		hInteropObject = spout.interop.LinkGLDXtextures(spout.interop.m_pd3dDevice,
+			pSharedTexture,
+			dxShareHandle,
+			glTexture);
+		if (!hInteropObject) {
+			spout.interop.spoutdx.ReleaseDX11Texture(spout.interop.m_pd3dDevice, pSharedTexture);
+			SpoutLogError("SpoutDemo::GLDXready (DX11) - LinkGLDXtextures failed");
+			return false;
+		}
+
+		SpoutLogNotice("    Test DX11 texture created and linked OK");
+
+		// All passes, so unregister and release textures
+		// m_hInteropDevice remains and does not need to be created again
+		if (spout.interop.m_hInteropDevice && hInteropObject) {
+			wglDXUnregisterObjectNV(spout.interop.m_hInteropDevice, hInteropObject);
+			if (!wglDXCloseDeviceNV(spout.interop.m_hInteropDevice)) {
+				SpoutLogWarning("SpoutDemo::GLDXReady DX11 - could not close interop");
+			}
+			spout.interop.m_hInteropDevice = NULL;
+		}
+
+		spout.interop.spoutdx.ReleaseDX11Texture(spout.interop.m_pd3dDevice, pSharedTexture);
+
+		if (glTexture)
+			glDeleteTextures(1, &glTexture);
+
+	}
+
+	return true;
+
+}
+
+bool ofApp::CheckForDirectX9c()
+{
+	// HKLM\Software\Microsoft\DirectX\Version should be 4.09.00.0904
+	// handy information : http://en.wikipedia.org/wiki/DirectX
+	HKEY  hRegKey;
+	LONG  regres;
+	DWORD  dwSize, major, minor, revision, notused;
+	char value[256];
+	dwSize = 256;
+
+	// Does the key exist
+	regres = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\DirectX", NULL, KEY_READ, &hRegKey);
+	if (regres == ERROR_SUCCESS) {
+		// Read the key
+		regres = RegQueryValueExA(hRegKey, "Version", 0, NULL, (LPBYTE)value, &dwSize);
+		// Decode the string : 4.09.00.0904
+		sscanf_s(value, "%d.%d.%d.%d", &major, &minor, &notused, &revision);
+		RegCloseKey(hRegKey);
+		if (major == 4 && minor == 9 && revision == 904)
+			return true;
+	}
+	return false;
+
+}
+
+
+void ofApp::trim(char* s) {
+	char* p = s;
+	int l = (int)strlen(p);
+
+	while (isspace(p[l - 1])) p[--l] = 0;
+	while (*p && isspace(*p)) ++p, --l;
+
+	memmove(s, p, l + 1);
 }

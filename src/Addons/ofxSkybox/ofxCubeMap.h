@@ -25,13 +25,20 @@ public:
 	void loadImages( string pos_x, string pos_y, string pos_z, string neg_x,string neg_y,string neg_z)
 	{	
 		ofImage images[6];	
+		/*
 		bool loaded1 = images[0].load(pos_x);
 		bool loaded2 = images[1].load(neg_x);
 		bool loaded3 = images[2].load(pos_y);
 		bool loaded4 = images[3].load(neg_y);
 		bool loaded5 = images[4].load(pos_z);
 		bool loaded6 = images[5].load(neg_z);
-		
+		*/
+		images[0].load(pos_x);
+		images[1].load(neg_x);
+		images[2].load(pos_y);
+		images[3].load(neg_y);
+		images[4].load(pos_z);
+		images[5].load(neg_z);
 
 		loadFromOfImages(images[0],
 						 images[2],
