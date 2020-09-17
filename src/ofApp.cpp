@@ -363,18 +363,38 @@ void ofApp::draw() {
 			str = text;
 			myFont.drawString(str, 10, 30);
 
-			// For debugging to show the sender adapter index and name
-			// if the receiver and sender are using different adappters
-			// TODO : test for texture share mode
-			// The sender graphics adapter index. TODO : add function to SpoutReceiver class
-			if (shareMode == 2) { // Auto share mode
-				senderadapter = receiver.spout.interop.GetSenderAdapter(receiver.GetSenderName());
-				if (senderadapter != currentadapter) {
-					str = "Sender adapter : ";
-					// The sender graphics adapter name
-					str += adaptername[senderadapter];
-					myFont.drawString(str, 10, 74);
-				}
+			// Graphics adapter details
+			//    o	Adapter name
+			//    o User selected sharing mode
+			//    o Compatibility sharing mode
+
+			// Get the current graphics adapter index and name
+			str = ofToString(currentadapter);
+			str += " : ";
+			str += adaptername[currentadapter];
+
+			// Memoryshare
+			if (shareMode == 1) {
+				str += " : Memory share";
+			}
+			// Texture share (Auto share mode to be removed)
+			else {
+				if (receiver.GetMemoryShare())
+					str += " : Memory share compatible";
+				else
+					str += " : Texture share";
+			}
+			myFont.drawString(str, 10, 52);
+			
+			// If the receiver and sender are using different adapters
+			// show the sender graphics adapter index and name.
+			senderadapter = receiver.spout.interop.GetSenderAdapter(receiver.GetSenderName());
+			if (senderadapter != currentadapter) {
+				str = "Sender adapter ";
+				str += ofToString(senderadapter);
+				str += " : ";
+				str += adaptername[senderadapter];
+				myFont.drawString(str, 10, 74);
 			}
 
 			myFont.drawString("RH click to select sender", 10, ofGetHeight() - 20);
@@ -383,42 +403,7 @@ void ofApp::draw() {
 			myFont.drawString("No sender detected", 10, 30);
 		}
 
-		// Graphics adapter details
-		//    o	Adapter name
-		//    o User selected sharing mode
-		//    o Compatibility sharing mode
 
-		// Show current adapter name and share mode
-		str = adaptername[currentadapter];
-
-		// User selected share mode
-		switch (shareMode) {
-			case 0:
-				str += " : Texture share ";
-				break;
-			case 1:
-				str += " : Memory share ";
-				break;
-			case 2:
-				str += " : Auto share ";
-				break;
-			default:
-				break;
-		}
-
-		// Get the current sharing mode using GetMemoryShare().
-		// This changes with graphics compatibility for Auto share mode
-		// compared to GetMemoryShareMode() and GetShareMode() 
-		// which read the user-selected mode from the registry
-		if (receiver.GetMemoryShare()) {
-			if (shareMode != 1) // Texture or Auto
-				str += "(Current : Memory)";
-		}
-		else if (shareMode == 2) // Auto mode
-			str += "(Current : Texture)";
-
-		myFont.drawString(str, 10, 52);
-		
 	} // endif show info
 
 #else
@@ -491,28 +476,21 @@ void ofApp::draw() {
 		//    o User selected sharing mode
 		//    o Compatibility sharing mode
 
-		// Get the current graphics adapter name
-		str = adaptername[currentadapter];
+		// Get the current graphics adapter index and name
+		str = ofToString(currentadapter);
+		str += " : ";
+		str += adaptername[currentadapter];
 
-		// Show the sharing mode
-		switch (shareMode) {
-			case 0 :
-				str += " : Texture share mode ";
-				break;
-			case 1 :
-				str += " : Memory share mode ";
-				break;
-			default :
-				str += " : Auto share mode ";
-				// Get the current sharing mode using GetMemoryShare().
-				// This changes with graphics compatibility for Auto share mode
-				// compared to GetMemoryShareMode() and GetShareMode() 
-				// which read the user-selected mode from the registry
-				if (sender.GetMemoryShare())
-					str += " (Memory)";
-				else
-					str += " (Texture)";
-				break;
+		// Memoryshare
+		if (shareMode == 1) {
+				str += " : Memory share";
+		}
+		// Texture share (Auto share mode to be removed)
+		else {
+			if (sender.GetMemoryShare())
+				str += " : Memory share compatible";
+			else
+				str += " : Texture share";
 		}
 
 		myFont.drawString(str, 20, 52);
@@ -834,7 +812,7 @@ INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 void ofApp::SelectAdapter()
 {
 	// OpenGL/DirectX interop compatibility is unknown for the selected adapter unless tested.
-	// Either use Memory share to bypass the test or Auto share mode to switch if necessary.
+	// Either use Memory share to bypass the test or the share mode will switch if necessary.
 	// The adapter name list should not have changed since the program started
 
 	#ifdef BUILDRECEIVER
@@ -854,30 +832,30 @@ void ofApp::SelectAdapter()
 		// OK - adapter index (selectedadapter) has been selected
 #ifdef BUILDRECEIVER
 		// Set the selected adapter if different
+		// A new sender will be detected on the first ReceiveTexture call (Requires 2.007)
 		if (selectedadapter != currentadapter) {
-			// A new sender will be detected on the first ReceiveTexture call (Requires 2.007)
+			// A new sender using the selected adapter will be created
+			// on the first SendTexture call (Requires 2.007)
 			receiver.ReleaseReceiver();
+			// Update the share mode flags for repeats
+			// The application could have changed to memory share
+			// the last time an adapter was selected.
+			receiver.SetShareMode(shareMode);
 			if (!receiver.SetAdapter(selectedadapter)) {
 				// SetAdapter returns to the primary adapter for failure
-				// If the user selected Texture share mode, check whether 
-				// the compatibility test switched to memory share
-				if (shareMode == 0 && receiver.GetMemoryShare() == 1) {
-					MessageBoxA(NULL, "Graphics adapter not compatible\nSelect Auto share mode", "SpoutDemo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-				}
-				else {
-					// Refer to error logs for diagnostics
-					MessageBoxA(NULL, "Could not select graphics adapter", "SpoutDemo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-				}
+				// Refer to error logs for diagnostics
+				MessageBoxA(NULL, "Could not select graphics adapter", "SpoutDemo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
 				// Set the adapter back to what it was (the compatibility test is repeated)
 				receiver.SetAdapter(currentadapter);
 			}
 			else {
 				// Change the application current adapter index to the one selected
-				// This will take effect when a sender is detected
+				// This will take effect when the sender is re-created
 				currentadapter = selectedadapter;
-				// Update the share mode flags for repeats
-				receiver.SetShareMode(shareMode); 
 			}
+			// If the user selected Texture share mode, the compatibility test
+			// could have switched the application to memory share.
+			// This can be tested with : GetMemoryShare();
 		}
 #else
 		// Set the selected adapter if different
@@ -885,17 +863,14 @@ void ofApp::SelectAdapter()
 			// A new sender using the selected adapter will be created
 			// on the first SendTexture call (Requires 2.007)
 			sender.ReleaseSender();
+			// Update the share mode flags for repeats
+			// The application could have changed to memory share
+			// the last time an adapter was selected.
+			sender.SetShareMode(shareMode);
 			if (!sender.SetAdapter(selectedadapter)) {
 				// SetAdapter returns to the primary adapter for failure
-				// If the user selected Texture share mode, check whether 
-				// the compatibility test switched to memory share
-				if (shareMode == 0 && sender.GetMemoryShare() == 1) {
-					MessageBoxA(NULL, "Graphics adapter not compatible\nSelect Auto share mode", "SpoutDemo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-				}
-				else {
-					// Refer to error logs for diagnostics
-					MessageBoxA(NULL, "Could not select graphics adapter", "SpoutDemo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-				}
+				// Refer to error logs for diagnostics
+				MessageBoxA(NULL, "Could not select graphics adapter", "SpoutDemo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
 				// Set the adapter back to what it was (the compatibility test is repeated)
 				sender.SetAdapter(currentadapter);
 			}
@@ -903,9 +878,10 @@ void ofApp::SelectAdapter()
 				// Change the application current adapter index to the one selected
 				// This will take effect when the sender is re-created
 				currentadapter = selectedadapter;
-				// Update the share mode flags for repeats
-				receiver.SetShareMode(shareMode);
 			}
+			// If the user selected Texture share mode, the compatibility test
+			// could have switched the application to memory share.
+			// This can be tested with : GetMemoryShare();
 		}
 #endif
 	}
