@@ -11,17 +11,26 @@ class nVidia
 
         nVidia();
         ~nVidia();
+
 		bool IsLaptop(bool *integrated);
-		bool ActivateNVIDIA(int iPreference);
-		int GetNVIDIA(unsigned int *DriverVersion, char * BuilBranchString);
-		int SetThreadedOptimization(int mode);
-		int GetThreadedOptimization();
+		bool GetNvidiaSystem(int *systemType, int *gpuType);
+		bool SetNvidiaGPU(int iPreference);
+		int  GetNvidiaGPU(unsigned int *DriverVersion, char * BuilBranchString);
+		bool SetThreadedOptimization(int mode);
+		int  GetThreadedOptimization();
 
 	protected :
+
+		bool InitializeNvidia();
+		void ReleaseNvidia();
+		bool CreateSession();
+		bool LoadBaseProfile();
+		bool GetGPUtype(int *systemType, int *gpuType);
 
 		NvDRSSessionHandle hSession;
 		NvDRSProfileHandle hProfile;
 		NvAPI_Status status;
+		bool initialized;
 
 };
 

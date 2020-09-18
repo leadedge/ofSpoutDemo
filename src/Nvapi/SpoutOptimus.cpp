@@ -14,303 +14,338 @@
 //	The application has to be re-started before the settings take effect,
 //	but other apps started subsequently should use the modified base settings.
 //
-
-// 11.02.17 - return driver number and driver-branch string
-
+//
+// 11.02.17 - Return driver number and driver-branch string for GetNvidiaGPU
+// 31.08.20 - Add local functions for Nvidia
+//			  Cleanup thoughout
+//
 
 nVidia::nVidia() {
 	hSession = 0;
 	hProfile = 0;
 	status = NVAPI_ERROR;
+	initialized = false;
 }
 
 nVidia::~nVidia() { }
 
-	bool nVidia::IsLaptop(bool *integrated)
-	{
-		bool bOptimus = false;
-		bool bLaptop = false;
-		bool bIntegrated = false;
+// LJ DEBUG - dll detection does not work on Windows 10
+// https://devtalk.nvidia.com/default/topic/510885/optimus-detection-c-/
+// bool nVidia::IsOptimus()
 
-		// (0) Initialize NVAPI. This must be done first of all
-		status = NvAPI_Initialize();
-		if (status != NVAPI_OK) {
-			// will fail silently if not supported
-			printf("nVidia::IsLaptop : NvAPI_Initialize error\n");
-			return false;
-		}
+bool nVidia::IsLaptop(bool *integrated)
+{
+	bool bOptimus = false;
+	bool bLaptop = false;
+	bool bIntegrated = false;
 
-		// Then, we need to get the handle for the system's physical GPU.
-		// The NvAPI_EnumPhysicalGPUs function accomplishes this.
-		// We then go through all the handles and use NvAPI_GPU_GetSystemType()
-		// to check if the GPU is a laptop GPU.
-		// If it is, we have to check whether the GPU is discrete
-		// using NvAPI_GPU_GetGPUType(). 
-
-		// For reference, here's the documentation for those NVApi functions:
-		// http://docs.nvidia.com/gameworks/content/gameworkslibrary/coresdk/nvapi/group__gpu.html
-
-		// NVAPI_INTERFACE NvAPI_EnumPhysicalGPUs (NvPhysicalGpuHandle nvGPUHandle[NVAPI_MAX_PHYSICAL_GPUS], NvU32 *pGpuCount)
-		// This function returns an array of physical GPU handles.
-		// Each handle represents a physical GPU present in the system.
-		// That GPU may be part of an SLI configuration, or may not be visible
-		// to the OS directly.
-		// At least one GPU must be present in the system and
-		// running an NVIDIA display driver.
-		// The array nvGPUHandle will be filled with physical GPU handle values.
-		// The returned gpuCount determines how many entries in the array are valid.
-		NvPhysicalGpuHandle nvGPUHandle[NVAPI_MAX_PHYSICAL_GPUS];
-		NvU32 GpuCount = 0;
-		status = NvAPI_EnumPhysicalGPUs(nvGPUHandle, &GpuCount);
-		if (status != NVAPI_OK) {
-			printf("nVidia::IsLaptop : NvAPI_EnumPhysicalGPUs error\n");
-			return false;
-		}
-		// printf("nVidia::IsLaptop : GPuCount = %d\n", GpuCount);
-
-		// Go through all the handles and use NvAPI_GPU_GetSystemType()
-		// to check if the GPU is a laptop GPU.
-		// NvAPI_GPU_GetSystemType (NvPhysicalGpuHandle hPhysicalGpu, NV_SYSTEM_TYPE * pSystemType)
-		// This function identifies whether the GPU is a notebook GPU or a desktop GPU.
-		// Return values
-		// NVAPI_INVALID_ARGUMENT : hPhysicalGpu or pOutputsMask is NULL
-		// NVAPI_OK	: *pSystemType contains the GPU system type
-		// NVAPI_NVIDIA_DEVICE_NOT_FOUND : No NVIDIA GPU driving a display was found
-		// NVAPI_EXPECTED_PHYSICAL_GPU_HANDLE : hPhysicalGpu was not a physical GPU handle
-		//
-		NV_SYSTEM_TYPE SystemType = NV_SYSTEM_TYPE_UNKNOWN;
-		// NV_SYSTEM_TYPE_UNKNOWN = 0,
-		// NV_SYSTEM_TYPE_LAPTOP = 1,
-		// NV_SYSTEM_TYPE_DESKTOP = 2,
-		for (unsigned int i = 0; i < GpuCount; i++) {
-			if (NvAPI_GPU_GetSystemType(nvGPUHandle[i], &SystemType) == NVAPI_OK) {
-				/*
-				printf("System type = %d\n", SystemType);
-				if (SystemType == NV_SYSTEM_TYPE_UNKNOWN)
-					printf("Unknown System type\n");
-				if (SystemType == NV_SYSTEM_TYPE_LAPTOP)
-					printf("Laptop system\n");
-				if (SystemType == NV_SYSTEM_TYPE_DESKTOP)
-					printf("Desktop system\n");
-				*/
-				if (SystemType == NV_SYSTEM_TYPE_LAPTOP) {
-
-					bLaptop = true; // Shows it is a laptop.
-
-					// we have to check whether the GPU is discrete using NvAPI_GPU_GetGPUType()
-					// NVAPI_INTERFACE NvAPI_GPU_GetGPUType(__in NvPhysicalGpuHandle hPhysicalGpu, __inout NV_GPU_TYPE * pGpuType);
-					// This function returns the GPU type(integrated or discrete).
-					//    0 - NV_SYSTEM_TYPE_GPU_UNKNOWN 	
-					//    1 - NV_SYSTEM_TYPE_IGPU : Integrated GPU.
-					//    2 - NV_SYSTEM_TYPE_DGPU : Discrete GPU.
-					//
-					NV_GPU_TYPE GpuType = NV_SYSTEM_TYPE_GPU_UNKNOWN;
-					status = NvAPI_GPU_GetGPUType(nvGPUHandle[i], &GpuType);
-					if (status == NVAPI_OK) {
-						/*
-						printf("GpuType = %d\n", GpuType);
-						if (GpuType == NV_SYSTEM_TYPE_GPU_UNKNOWN)
-							printf("Unknown GPU type\n");
-						if (GpuType == NV_SYSTEM_TYPE_IGPU)
-							printf("Integrated GPU\n");
-						if (GpuType == NV_SYSTEM_TYPE_GPU_UNKNOWN)
-							printf("Discrete GPU\n");
-						*/
-
-						// TODO : what does integrated mean
-						// Using the integrate GPU or has an integrated GPU ?
-						if (GpuType == NV_SYSTEM_TYPE_IGPU) {
-							bIntegrated = true;
-							bOptimus = true;
-						}
-
-					}
-					
-				}
-			}
-			*integrated = bIntegrated;
-		}
-
-		NvAPI_Unload();
-
-		// printf("nVidia::IsOptimus : Optimus graphics = %d\n", bOptimus);
-		// printf("nVidia::IsLaptop = %d (integrated = %d)\n", bLaptop, bIntegrated);
-
-		return bLaptop;
+	// (0) Initialize NVAPI. This must be done first of all
+	status = NvAPI_Initialize();
+	if (status != NVAPI_OK) {
+		// will fail silently if not supported
+		printf("nVidia::IsLaptop : NvAPI_Initialize error\n");
+		return false;
 	}
 
+	// Then, we need to get the handle for the system's physical GPU.
+	// The NvAPI_EnumPhysicalGPUs function accomplishes this.
+	// We then go through all the handles and use NvAPI_GPU_GetSystemType()
+	// to check if the GPU is a laptop GPU.
+	// If it is, we have to check whether the GPU is discrete
+	// using NvAPI_GPU_GetGPUType(). 
+
+	// For reference, here's the documentation for those NVApi functions:
+	// http://docs.nvidia.com/gameworks/content/gameworkslibrary/coresdk/nvapi/group__gpu.html
+
+	// NVAPI_INTERFACE NvAPI_EnumPhysicalGPUs (NvPhysicalGpuHandle nvGPUHandle[NVAPI_MAX_PHYSICAL_GPUS], NvU32 *pGpuCount)
+	// This function returns an array of physical GPU handles.
+	// Each handle represents a physical GPU present in the system.
+	// That GPU may be part of an SLI configuration, or may not be visible
+	// to the OS directly.
+	// At least one GPU must be present in the system and
+	// running an NVIDIA display driver.
+	// The array nvGPUHandle will be filled with physical GPU handle values.
+	// The returned gpuCount determines how many entries in the array are valid.
+	NvPhysicalGpuHandle nvGPUHandle[NVAPI_MAX_PHYSICAL_GPUS];
+	NvU32 GpuCount = 0;
+	status = NvAPI_EnumPhysicalGPUs(nvGPUHandle, &GpuCount);
+	if (status != NVAPI_OK) {
+		printf("nVidia::IsLaptop : NvAPI_EnumPhysicalGPUs error\n");
+		return false;
+	}
+	// printf("nVidia::IsLaptop : GPuCount = %d\n", GpuCount);
+
+	// Go through all the handles and use NvAPI_GPU_GetSystemType()
+	// to check if the GPU is a laptop GPU.
+	// NvAPI_GPU_GetSystemType (NvPhysicalGpuHandle hPhysicalGpu, NV_SYSTEM_TYPE * pSystemType)
+	// This function identifies whether the GPU is a notebook GPU or a desktop GPU.
+	// Return values
+	// NVAPI_INVALID_ARGUMENT : hPhysicalGpu or pOutputsMask is NULL
+	// NVAPI_OK	: *pSystemType contains the GPU system type
+	// NVAPI_NVIDIA_DEVICE_NOT_FOUND : No NVIDIA GPU driving a display was found
+	// NVAPI_EXPECTED_PHYSICAL_GPU_HANDLE : hPhysicalGpu was not a physical GPU handle
 	//
-	// 0 - high preformance
-	// 1 - integrated
-	// 2 - auto select
+	NV_SYSTEM_TYPE SystemType = NV_SYSTEM_TYPE_UNKNOWN;
+	// NV_SYSTEM_TYPE_UNKNOWN = 0,
+	// NV_SYSTEM_TYPE_LAPTOP = 1,
+	// NV_SYSTEM_TYPE_DESKTOP = 2,
+	for (unsigned int i = 0; i < GpuCount; i++) {
+		if (NvAPI_GPU_GetSystemType(nvGPUHandle[i], &SystemType) == NVAPI_OK) {
+			/*
+			printf("System type = %d\n", SystemType);
+			if (SystemType == NV_SYSTEM_TYPE_UNKNOWN)
+				printf("Unknown System type\n");
+			if (SystemType == NV_SYSTEM_TYPE_LAPTOP)
+				printf("Laptop system\n");
+			if (SystemType == NV_SYSTEM_TYPE_DESKTOP)
+				printf("Desktop system\n");
+			*/
+			if (SystemType == NV_SYSTEM_TYPE_LAPTOP) {
+
+				bLaptop = true; // Shows it is a laptop.
+
+				// we have to check whether the GPU is discrete using NvAPI_GPU_GetGPUType()
+				// NVAPI_INTERFACE NvAPI_GPU_GetGPUType(__in NvPhysicalGpuHandle hPhysicalGpu, __inout NV_GPU_TYPE * pGpuType);
+				// This function returns the GPU type(integrated or discrete).
+				//    0 - NV_SYSTEM_TYPE_GPU_UNKNOWN 	
+				//    1 - NV_SYSTEM_TYPE_IGPU : Integrated GPU.
+				//    2 - NV_SYSTEM_TYPE_DGPU : Discrete GPU.
+				//
+				NV_GPU_TYPE GpuType = NV_SYSTEM_TYPE_GPU_UNKNOWN;
+				status = NvAPI_GPU_GetGPUType(nvGPUHandle[i], &GpuType);
+				if (status == NVAPI_OK) {
+					/*
+					printf("GpuType = %d\n", GpuType);
+					if (GpuType == NV_SYSTEM_TYPE_GPU_UNKNOWN)
+						printf("Unknown GPU type\n");
+					if (GpuType == NV_SYSTEM_TYPE_IGPU)
+						printf("Integrated GPU\n");
+					if (GpuType == NV_SYSTEM_TYPE_GPU_UNKNOWN)
+						printf("Discrete GPU\n");
+					*/
+
+					// TODO : what does integrated mean
+					// Using the integrate GPU or has an integrated GPU ?
+					if (GpuType == NV_SYSTEM_TYPE_IGPU) {
+						bIntegrated = true;
+						bOptimus = true;
+					}
+
+				}
+
+			}
+		}
+		*integrated = bIntegrated;
+	}
+
+	NvAPI_Unload();
+
+	// printf("nVidia::IsOptimus : Optimus graphics = %d\n", bOptimus);
+	// printf("nVidia::IsLaptop = %d (integrated = %d)\n", bLaptop, bIntegrated);
+
+	return bLaptop;
+}
+
+
+// systemtype  0 - unknown : 1 - laptop     : 2 - desktop
+// gputype     0 - unknown : 1 - integrated : 2 - discrete
+bool nVidia::GetNvidiaSystem(int *systemType, int *gpuType)
+{
+	int systemtype = 0;
+	int gputype = 0;
+
+	/*
+	// TODO : unreliable
+	// Check for Optimus - nvd3d9wrap.dll is loaded into all processes when Optimus is enabled.
+	if(GetModuleHandleA("nvd3d9wrap.dll") || GetModuleHandleA("nvinit.dll")) {
+		// printf("nVidia::IsOptimus : Optimus graphics dlls found\n");
+		// return true;
+	}
+	// else {
+		// printf("nVidia::IsOptimus : Optimus graphics dlls not found\n");
+	// }
+	*/
+
+	// (0) Initialize NVAPI. This must be done first of all
+	if (!InitializeNvidia())
+		return false;
+
+	// systemtype  0 - unknown : 1 - laptop     : 2 - desktop
+	// gputype     0 - unknown : 1 - integrated : 2 - discrete
+	if (!GetGPUtype(&systemtype, &gputype)) {
+		ReleaseNvidia();
+		return false;
+	}
+
+	*systemType = systemtype;
+	*gpuType = gputype;
+
+	return true;
+
+	ReleaseNvidia();
+
+	// printf("nVidia::IsOptimus : Optimus graphics = %d\n", bOptimus);
+	// printf("nVidia::IsLaptop = %d (integrated = %d)\n", bLaptop, bIntegrated);
+
+	return true;
+}
+
+//
+// 0 - high performance
+// 1 - integrated
+// 2 - auto select
+//
+bool nVidia::SetNvidiaGPU(int index)
+{
+	// (0) Initialize NVAPI. This must be done first of all
+	if (!InitializeNvidia())
+		return false;
+
+	// (1) Create the session handle to access driver settings
+	// (2) load all the system settings into the session
+	if (!CreateSession()) {
+		ReleaseNvidia();
+		return false;
+	}
+
+	// (3) Obtain the Base profile. Any setting needs to be inside
+	// a profile, putting a setting on the Base Profile enforces it
+	// for all the processes on the system
+	if (!LoadBaseProfile()) {
+		ReleaseNvidia();
+		return false;
+	}
+
+	// =================================================================================
 	//
-	bool nVidia::ActivateNVIDIA(int index)
-	{
+	// SET OPTIMUS
+	//
+	// Now modify the settings to set NVIDIA global
+	// TODO : documentation
+	NVDRS_SETTING drsSetting1 = {0};
+	drsSetting1.version = NVDRS_SETTING_VER;
+	drsSetting1.settingId = SHIM_MCCOMPAT_ID;
+	drsSetting1.settingType = NVDRS_DWORD_TYPE;
+
+	NVDRS_SETTING drsSetting2 = {0};
+	drsSetting2.version = NVDRS_SETTING_VER;
+	drsSetting2.settingId = SHIM_RENDERING_MODE_ID;
+	drsSetting2.settingType = NVDRS_DWORD_TYPE;
+
+	NVDRS_SETTING drsSetting3 = {0};
+	drsSetting3.version = NVDRS_SETTING_VER;
+	drsSetting3.settingId = SHIM_RENDERING_OPTIONS_ID;
+	drsSetting3.settingType = NVDRS_DWORD_TYPE;
+
+	// Optimus flags for enabled applications
+	if(index == 0)
+		drsSetting1.u32CurrentValue = SHIM_MCCOMPAT_ENABLE;			// 0
+	else if(index == 1)
+		drsSetting1.u32CurrentValue = SHIM_MCCOMPAT_INTEGRATED;		// 1
+	else
+		drsSetting1.u32CurrentValue = SHIM_MCCOMPAT_AUTO_SELECT;	// 2
+
+	// other options
+	//		SHIM_MCCOMPAT_INTEGRATED		// 1
+	//		SHIM_MCCOMPAT_USER_EDITABLE
+	//		SHIM_MCCOMPAT_VARYING_BIT
+	//		SHIM_MCCOMPAT_AUTO_SELECT		// 2
 		
-		// ====================================================
-		// (0) Initialize NVAPI. This must be done first of all
-		status = NvAPI_Initialize();
-		if (status != NVAPI_OK) {
-			// will fail silently if not supported
-			printf("nVidia::ActivateNVIDIA : NvAPI_Initialize error\n");
-			return false;
-		}
+	// Enable application for Optimus
+	if(index == 0)
+		drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_ENABLE;		// 0
+	else if(index == 1)
+		drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_INTEGRATED;	// 1
+	else
+		drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_ENABLE;		// 2
 
-		// (1) Create the session handle to access driver settings
-		hSession = 0;
-		status = NvAPI_DRS_CreateSession(&hSession);
-		if (status != NVAPI_OK) {
-			printf("nVidia::ActivateNVIDIA : NvAPI_DRS_CreateSession error\n");
-			return false;
-		}
+	// other options
+	//		SHIM_RENDERING_MODE_INTEGRATED		// 1
+	//		SHIM_RENDERING_MODE_USER_EDITABLE
+	//		SHIM_RENDERING_MODE_VARYING_BIT
+	//		SHIM_RENDERING_MODE_AUTO_SELECT		// 2
+	//		SHIM_RENDERING_MODE_OVERRIDE_BIT
+	//		SHIM_MCCOMPAT_OVERRIDE_BIT
+	
+	// Shim rendering modes per application for Optimus
+	// drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE; // 0
+	if(index == 0)
+		drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE; // 0
+	else if(index == 1)
+		drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE | SHIM_RENDERING_OPTIONS_IGPU_TRANSCODING;	// 1
+	else
+		drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE;		// 2
 
-		// (2) load all the system settings into the session
-		status = NvAPI_DRS_LoadSettings(hSession);
-		if (status != NVAPI_OK) {
-			printf("nVidia::ActivateNVIDIA : NvAPI_DRS_LoadSettings error\n");
-			return false;
-		}
+	// other options
+	//		SHIM_RENDERING_OPTIONS_DISABLE_ASYNC_PRESENT,
+	//		SHIM_RENDERING_OPTIONS_EHSHELL_DETECT,
+	//		SHIM_RENDERING_OPTIONS_FLASHPLAYER_HOST_DETECT,
+	//		SHIM_RENDERING_OPTIONS_VIDEO_DRM_APP_DETECT,
+	//		SHIM_RENDERING_OPTIONS_IGNORE_OVERRIDES,
+	//		SHIM_RENDERING_OPTIONS_CHILDPROCESS_DETECT,
+	//		SHIM_RENDERING_OPTIONS_ENABLE_DWM_ASYNC_PRESENT,
+	//		SHIM_RENDERING_OPTIONS_PARENTPROCESS_DETECT,
+	//		SHIM_RENDERING_OPTIONS_ALLOW_INHERITANCE,
+	//		SHIM_RENDERING_OPTIONS_DISABLE_WRAPPERS,
+	//		SHIM_RENDERING_OPTIONS_DISABLE_DXGI_WRAPPERS,
+	//		SHIM_RENDERING_OPTIONS_PRUNE_UNSUPPORTED_FORMATS,
+	//		SHIM_RENDERING_OPTIONS_ENABLE_ALPHA_FORMAT,
+	//		SHIM_RENDERING_OPTIONS_IGPU_TRANSCODING,				// 1 ** include for force integrated
+	//		SHIM_RENDERING_OPTIONS_DISABLE_CUDA,
+	//		SHIM_RENDERING_OPTIONS_ALLOW_CP_CAPS_FOR_VIDEO,
+	//		SHIM_RENDERING_OPTIONS_ENABLE_NEW_HOOKING,
+	//		SHIM_RENDERING_OPTIONS_DISABLE_DURING_SECURE_BOOT,
+	//		SHIM_RENDERING_OPTIONS_INVERT_FOR_QUADRO,
+	//		SHIM_RENDERING_OPTIONS_INVERT_FOR_MSHYBRID,
+	//		SHIM_RENDERING_OPTIONS_REGISTER_PROCESS_ENABLE_GOLD,
 
-		// (3) Obtain the Base profile. Any setting needs to be inside
-		// a profile, putting a setting on the Base Profile enforces it
-		// for all the processes on the system
-		hProfile = 0;
-		status = NvAPI_DRS_GetBaseProfile(hSession, &hProfile);
-		if (status != NVAPI_OK) {
-			printf("nVidia::ActivateNVIDIA : NvAPI_DRS_GetBaseProfile error\n");
-			return false;
-		}
+	// Code from "SOP" example
+	//	if( ForceIntegrated ){
+	//		drsSetting1.u32CurrentValue = SHIM_MCCOMPAT_INTEGRATED;
+	//		drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_INTEGRATED;
+	//		drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE | SHIM_RENDERING_OPTIONS_IGPU_TRANSCODING;
+	//	}else{
+	//		drsSetting1.u32CurrentValue = SHIM_MCCOMPAT_ENABLE;
+	//		drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_ENABLE;
+	//		drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE;
+	//	}
 
+	status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting1);
+	if (status != NVAPI_OK) {
+		printf("nVidia::SetNvidiaGPU : NvAPI_DRS_SetSetting 1 error\n");
+		ReleaseNvidia();
+		return false;
+	}
+	status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting2);
+	if (status != NVAPI_OK) {
+		printf("nVidia::SetNvidiaGPU : NvAPI_DRS_SetSetting 2 error\n");
+		ReleaseNvidia();
+		return false;
+	}
+	status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting3);
+	if (status != NVAPI_OK) {
+		printf("nVidia::SetNvidiaGPU : NvAPI_DRS_SetSetting 3 error\n");
+		ReleaseNvidia();
+		return false;
+	}
+	// (5) Now apply (or save) our changes to the system
+	status = NvAPI_DRS_SaveSettings(hSession);
+	if (status != NVAPI_OK) {
+		char temp[256];
+		sprintf_s(temp, 256, "nVidia::SetNvidiaGPU : NvAPI_DRS_SaveSettings error (%x) [%p]", (unsigned int)status, hSession);
+		printf("%s\n", temp);
+		ReleaseNvidia();
+		return false;
+	}
+	//
+	// END SET OPTIMUS
+	// =================================================================================
+	// (6) We clean up. This is analogous to doing a free()
+	ReleaseNvidia();
 
-		// Now modify the settings to set NVIDIA global
-		// TODO : documentation
-		NVDRS_SETTING drsSetting1 = {0};
-		drsSetting1.version = NVDRS_SETTING_VER;
-		drsSetting1.settingId = SHIM_MCCOMPAT_ID;
-		drsSetting1.settingType = NVDRS_DWORD_TYPE;
+	return true;
 
-		NVDRS_SETTING drsSetting2 = {0};
-		drsSetting2.version = NVDRS_SETTING_VER;
-		drsSetting2.settingId = SHIM_RENDERING_MODE_ID;
-		drsSetting2.settingType = NVDRS_DWORD_TYPE;
-
-		NVDRS_SETTING drsSetting3 = {0};
-		drsSetting3.version = NVDRS_SETTING_VER;
-		drsSetting3.settingId = SHIM_RENDERING_OPTIONS_ID;
-		drsSetting3.settingType = NVDRS_DWORD_TYPE;
-
-		// Optimus flags for enabled applications
-		if(index == 0)
-			drsSetting1.u32CurrentValue = SHIM_MCCOMPAT_ENABLE;			// 0
-		else if(index == 1)
-			drsSetting1.u32CurrentValue = SHIM_MCCOMPAT_INTEGRATED;		// 1
-		else
-			drsSetting1.u32CurrentValue = SHIM_MCCOMPAT_AUTO_SELECT;	// 2
-
-		// other options
-		//		SHIM_MCCOMPAT_INTEGRATED		// 1
-		//		SHIM_MCCOMPAT_USER_EDITABLE
-		//		SHIM_MCCOMPAT_VARYING_BIT
-		//		SHIM_MCCOMPAT_AUTO_SELECT		// 2
-		
-		// Enable application for Optimus
-		// drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_ENABLE; // 0
-		if(index == 0)
-			drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_ENABLE;		// 0
-		else if(index == 1)
-			drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_INTEGRATED;	// 1
-		else
-			drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_ENABLE;		// 2
-
-		// other options
-		//		SHIM_RENDERING_MODE_INTEGRATED		// 1
-		//		SHIM_RENDERING_MODE_USER_EDITABLE
-		//		SHIM_RENDERING_MODE_VARYING_BIT
-		//		SHIM_RENDERING_MODE_AUTO_SELECT		// 2
-		//		SHIM_RENDERING_MODE_OVERRIDE_BIT
-		//		SHIM_MCCOMPAT_OVERRIDE_BIT
-		
-		// Shim rendering modes per application for Optimus
-		// drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE; // 0
-		if(index == 0)
-			drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE; // 0
-		else if(index == 1)
-			drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE | SHIM_RENDERING_OPTIONS_IGPU_TRANSCODING;	// 1
-		else
-			drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE;		// 2
-
-		// other options
-		//		SHIM_RENDERING_OPTIONS_DISABLE_ASYNC_PRESENT,
-		//		SHIM_RENDERING_OPTIONS_EHSHELL_DETECT,
-		//		SHIM_RENDERING_OPTIONS_FLASHPLAYER_HOST_DETECT,
-		//		SHIM_RENDERING_OPTIONS_VIDEO_DRM_APP_DETECT,
-		//		SHIM_RENDERING_OPTIONS_IGNORE_OVERRIDES,
-		//		SHIM_RENDERING_OPTIONS_CHILDPROCESS_DETECT,
-		//		SHIM_RENDERING_OPTIONS_ENABLE_DWM_ASYNC_PRESENT,
-		//		SHIM_RENDERING_OPTIONS_PARENTPROCESS_DETECT,
-		//		SHIM_RENDERING_OPTIONS_ALLOW_INHERITANCE,
-		//		SHIM_RENDERING_OPTIONS_DISABLE_WRAPPERS,
-		//		SHIM_RENDERING_OPTIONS_DISABLE_DXGI_WRAPPERS,
-		//		SHIM_RENDERING_OPTIONS_PRUNE_UNSUPPORTED_FORMATS,
-		//		SHIM_RENDERING_OPTIONS_ENABLE_ALPHA_FORMAT,
-		//		SHIM_RENDERING_OPTIONS_IGPU_TRANSCODING,				// 1 ** include for force integrated
-		//		SHIM_RENDERING_OPTIONS_DISABLE_CUDA,
-		//		SHIM_RENDERING_OPTIONS_ALLOW_CP_CAPS_FOR_VIDEO,
-		//		SHIM_RENDERING_OPTIONS_ENABLE_NEW_HOOKING,
-		//		SHIM_RENDERING_OPTIONS_DISABLE_DURING_SECURE_BOOT,
-		//		SHIM_RENDERING_OPTIONS_INVERT_FOR_QUADRO,
-		//		SHIM_RENDERING_OPTIONS_INVERT_FOR_MSHYBRID,
-		//		SHIM_RENDERING_OPTIONS_REGISTER_PROCESS_ENABLE_GOLD,
-
-
-		// Code from "SOP" example
-		//	if( ForceIntegrated ){
-		//		drsSetting1.u32CurrentValue = SHIM_MCCOMPAT_INTEGRATED;
-		//		drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_INTEGRATED;
-		//		drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE | SHIM_RENDERING_OPTIONS_IGPU_TRANSCODING;
-		//	}else{
-		//		drsSetting1.u32CurrentValue = SHIM_MCCOMPAT_ENABLE;
-		//		drsSetting2.u32CurrentValue = SHIM_RENDERING_MODE_ENABLE;
-		//		drsSetting3.u32CurrentValue = SHIM_RENDERING_OPTIONS_DEFAULT_RENDERING_MODE;
-		//	}
-
-		status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting1);
-		if (status != NVAPI_OK) {
-			printf("nVidia::ActivateNVIDIA : NvAPI_DRS_SetSetting 1 error\n");
-			return false;
-		}
-
-		status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting2);
-		if (status != NVAPI_OK) {
-			printf("nVidia::ActivateNVIDIA : NvAPI_DRS_SetSetting 2 error\n");
-			return false;
-		}
-
-		status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting3);
-		if (status != NVAPI_OK) {
-			printf("nVidia::ActivateNVIDIA : NvAPI_DRS_SetSetting 3 error\n");
-			return false;
-		}
-
-		// (5) Now apply (or save) our changes to the system
-		status = NvAPI_DRS_SaveSettings(hSession);
-		if (status != NVAPI_OK) {
-			char temp[256];
-			sprintf_s(temp, 256, "nVidia::ActivateNVIDIA : NvAPI_DRS_SaveSettings error (%x) [%p]", (unsigned int)status, hSession);
-			printf("%s\n", temp);
-			return false;
-		}
-
-		// (6) We clean up. This is analogous to doing a free()
-		NvAPI_DRS_DestroySession(hSession);
-		hSession = 0;
-		NvAPI_Unload();
-
-		// printf("NVAPI Settings applied OK\nClose and restart program\n");
-
-		return true;
-
-} // end ActivateGlobal (index)
+} // end SetNvidiaGPU (index)
 
 
 //
@@ -319,20 +354,19 @@ nVidia::~nVidia() { }
 //  2 - auto select
 // -1 - fail
 //
-int nVidia::GetNVIDIA(unsigned int *DriverVersion, char * BuilBranchString)
+int nVidia::GetNvidiaGPU(unsigned int *DriverVersion, char * BuilBranchString)
 {
 	int mode = 0;
 	
-	// printf("nVidia::GetNVIDIA()\n");
+	// printf("nVidia::GetNvidiaGPU()\n");
 
 	// (0) Initialize NVAPI. This must be done first of all
-	status = NvAPI_Initialize();
-	if (status != NVAPI_OK) {
-		// will fail silently if not supported
-		printf("nVidia::GetNVIDIA : NvAPI_Initialize error\n");
-		return -1;
-	}
+	if(!InitializeNvidia())
+		return false;
 
+	// =================================================================================
+	//
+	// GET NVIDIA DRIVER
 	//
 	// NVAPI_INTERFACE NvAPI_SYS_GetDriverAndBranchVersion(NvU32 *pDriverVersion,
 	//													   NvAPI_ShortString szBuildBranchString)
@@ -341,7 +375,6 @@ int nVidia::GetNVIDIA(unsigned int *DriverVersion, char * BuilBranchString)
 	NvAPI_SYS_GetDriverAndBranchVersion(&driverVersion, szBuildBranchString);
 	// printf("Driver version : %d\n", driverVersion); // 37633
 	// printf("BuildBranchString = %s\n", szBuildBranchString); // r375_00
-
 	/*
 	// TODO - enumeration
 	NvDisplayHandle hNvDisp = NULL;
@@ -351,36 +384,28 @@ int nVidia::GetNVIDIA(unsigned int *DriverVersion, char * BuilBranchString)
 	NvAPI_ShortString szFullName;
 	NvAPI_GPU_GetFullName(hPhysicalGpu, szFullName);
 	*/
-
 	*DriverVersion = driverVersion;
 	strcpy_s(BuilBranchString, 64, szBuildBranchString);
 
-
 	// (1) Create the session handle to access driver settings
-	hSession = 0;
-	status = NvAPI_DRS_CreateSession(&hSession);
-	if (status != NVAPI_OK) {
-		printf("nVidia::GetNVIDIA : NvAPI_DRS_CreateSession error\n");
-		return 0;
-	}
-
 	// (2) load all the system settings into the session
-	status = NvAPI_DRS_LoadSettings(hSession);
-	if (status != NVAPI_OK) {
-		printf("nVidia::GetNVIDIA : NvAPI_DRS_LoadSettings error\n");
-		return 0;
+	if (!CreateSession()) {
+		ReleaseNvidia();
+		return -1;
 	}
 
 	// (3) Obtain the Base profile. Any setting needs to be inside
 	// a profile, putting a setting on the Base Profile enforces it
 	// for all the processes on the system
-	hProfile = 0;
-	status = NvAPI_DRS_GetBaseProfile(hSession, &hProfile);
-	if (status != NVAPI_OK) {
-		printf("nVidia::GetNVIDIA : NvAPI_DRS_GetBaseProfile error\n");
-		return 0;
+	if (!LoadBaseProfile()) {
+		ReleaseNvidia();
+		return -1;
 	}
 
+	// =================================================================================
+	//
+	// GET OPTIMUS
+	//
 	// Now get the settings
 	NVDRS_SETTING drsSetting1 = {0};
 	drsSetting1.version = NVDRS_SETTING_VER;
@@ -421,20 +446,18 @@ int nVidia::GetNVIDIA(unsigned int *DriverVersion, char * BuilBranchString)
 	// status = NvAPI_DRS_GetSetting(hSession, hProfile, SHIM_RENDERING_OPTIONS_ID, &drsSetting3);
 	// printf("drsSetting3.u32CurrentValue = %d\n", drsSetting3.u32CurrentValue);
 
+	//
+	// END GET OPTIMUS
+	// =================================================================================
+
 	// (6) We clean up. This is analogous to doing a free()
-	NvAPI_DRS_DestroySession(hSession);
-	hSession = 0;
-	NvAPI_Unload();
+	ReleaseNvidia();
 
 	return mode;
 
-} // end GetNVIDIA
+} // end GetNvidiaGPU
 
 
-//
-// Threaded optimization can affect texture sharing
-// This might have something to do with the OpenGL/DirectX interop
-// or some other reason. The symptom is that fps seems capped at 40.
 //
 // OGL_THREAD_CONTROL_ID = 0x20C1221E
 //    OGL_THREAD_CONTROL_ENABLE = 0x00000001,  ON
@@ -447,41 +470,34 @@ int nVidia::GetNVIDIA(unsigned int *DriverVersion, char * BuilBranchString)
 // 1 - on
 // 2 - off
 //
-int nVidia::SetThreadedOptimization(int mode)
+// Total time - 270-280 msec
+//
+bool nVidia::SetThreadedOptimization(int mode)
 {
+
 	// (0) Initialize NVAPI. This must be done first of all
-	status = NvAPI_Initialize();
-	if (status != NVAPI_OK) {
-		// will fail silently if not supported
-		printf("nVidia::SetThreadedOptimization : NvAPI_Initialize error\n");
-		return -1;
-	}
+	if(!InitializeNvidia()) // 6 msec
+		return false;
 
 	// (1) Create the session handle to access driver settings
-	hSession = 0;
-	status = NvAPI_DRS_CreateSession(&hSession);
-	if (status != NVAPI_OK) {
-		printf("nVidia::SetThreadedOptimization : NvAPI_DRS_CreateSession error\n");
-		return 0;
-	}
-
 	// (2) load all the system settings into the session
-	status = NvAPI_DRS_LoadSettings(hSession);
-	if (status != NVAPI_OK) {
-		printf("nVidia::SetThreadedOptimization : NvAPI_DRS_LoadSettings error\n");
-		return 0;
+	if (!CreateSession()) { // 220 msec
+		ReleaseNvidia();
+		return false;
 	}
 
 	// (3) Obtain the Base profile. Any setting needs to be inside
 	// a profile, putting a setting on the Base Profile enforces it
 	// for all the processes on the system
-	hProfile = 0;
-	status = NvAPI_DRS_GetBaseProfile(hSession, &hProfile);
-	if (status != NVAPI_OK) {
-		printf("nVidia::SetThreadedOptimization : NvAPI_DRS_GetBaseProfile error\n");
-		return 0;
+	if (!LoadBaseProfile()) { // 0.01 msec
+		ReleaseNvidia();
+		return false;
 	}
 
+	// =================================================================================
+	//
+	// SET THREADED OPTIMIZATION - 0.015 msec
+	//
 	//
 	// Docs http://developer.download.nvidia.com/NVAPI/PG-5116-001_v01_public.pdf
 	//
@@ -497,16 +513,19 @@ int nVidia::SetThreadedOptimization(int mode)
 	status = NvAPI_DRS_SetSetting(hSession, hProfile, &drsSetting);
 	if (status != NVAPI_OK) printf("nVidia::SetThreadedOptimization : NvAPI_DRS_SetSetting error\n"); 
 
-    // (5) Now we apply (or save) our changes to the system
-	status = NvAPI_DRS_SaveSettings(hSession);
-	if (status != NVAPI_OK) printf("nVidia::SetThreadedOptimization : NvAPI_DRS_SaveSettings error\n");
-	
-	// (6) We clean up. This is analogous to doing a free()
-	NvAPI_DRS_DestroySession(hSession);
-	hSession = 0;
-	NvAPI_Unload();
 
-	return mode;
+	// (5) Now we apply (or save) our changes to the system
+	status = NvAPI_DRS_SaveSettings(hSession); // 30 msec
+	if (status != NVAPI_OK) printf("nVidia::SetThreadedOptimization : NvAPI_DRS_SaveSettings error\n");
+
+	//
+	// END SET THREADED OPTIMIZATION
+	// =================================================================================
+
+	// (6) We clean up. This is analogous to doing a free()
+	ReleaseNvidia(); // 20 msec
+
+	return true;
 
 } // end SetThreadedOptimization
 
@@ -515,40 +534,30 @@ int nVidia::SetThreadedOptimization(int mode)
 // 0 - auto : 1 - on : 2 - off
 int nVidia::GetThreadedOptimization()
 {
-
+	// printf("nVidia::GetThreadedOptimization\n");
 	// (0) Initialize NVAPI. This must be done first of all
-	status = NvAPI_Initialize();
-	if (status != NVAPI_OK) {
-		// will fail silently if not supported
-		printf("nVidia::GetThreadedOptimization : NvAPI_Initialize error\n");
+	if (!InitializeNvidia())
 		return -1;
-	}
 
 	// (1) Create the session handle to access driver settings
-	hSession = 0;
-	status = NvAPI_DRS_CreateSession(&hSession);
-	if (status != NVAPI_OK) {
-		printf("nVidia::GetThreadedOptimization : NvAPI_DRS_CreateSession error\n");
-		return -1;
-	}
-
 	// (2) load all the system settings into the session
-	status = NvAPI_DRS_LoadSettings(hSession);
-	if (status != NVAPI_OK) {
-		printf("nVidia::GetThreadedOptimization : NvAPI_DRS_LoadSettings error\n");
+	if (!CreateSession()) {
+		ReleaseNvidia();
 		return -1;
 	}
 
 	// (3) Obtain the Base profile. Any setting needs to be inside
 	// a profile, putting a setting on the Base Profile enforces it
 	// for all the processes on the system
-	hProfile = 0;
-	status = NvAPI_DRS_GetBaseProfile(hSession, &hProfile);
-	if (status != NVAPI_OK) {
-		printf("nVidia::GetThreadedOptimization : NvAPI_DRS_GetBaseProfile error\n");
+	if (!LoadBaseProfile()) {
+		ReleaseNvidia();
 		return -1;
 	}
 
+	// =================================================================================
+	//
+	// GET THREADED OPTIMIZATION
+	//
 	//
 	// Docs http://developer.download.nvidia.com/NVAPI/PG-5116-001_v01_public.pdf
 	//
@@ -567,23 +576,197 @@ int nVidia::GetThreadedOptimization()
 	status = NvAPI_DRS_GetSetting(hSession, hProfile, OGL_THREAD_CONTROL_ID, &drsSetting);
 	if (status != NVAPI_OK) {
 		printf("nVidia::GetThreadedOptimization : NVAPI_DRS_GetSetting error\n");
+		ReleaseNvidia();
 		return -1;
 	}
-
 	// printf("drsSetting.u32CurrentValue = %i\n", drsSetting.u32CurrentValue);
 
 	// current DWORD value of this setting
 	int mode = (int)drsSetting.u32CurrentValue;
 
-	// (5) We clean up. This is analogous to doing a free()
-	NvAPI_DRS_DestroySession(hSession);
-	hSession = 0;
-	NvAPI_Unload();
+	//
+	// END GET THREADED OPTIMIZATION
+	// =================================================================================
 
-	// printf("thread mode = %d\n", mode);
+	// (5) We clean up. This is analogous to doing a free()
+	ReleaseNvidia();
+	// printf("threaded mode = %d\n", mode);
 
 	return mode;
 
 } // end GetThreadedOptimization
 
 
+
+//
+// PROTECTED
+//
+
+bool nVidia::InitializeNvidia()
+{
+	// (0) Initialize NVAPI. This must be done first of all
+	status = NvAPI_Initialize();
+	if (status != NVAPI_OK) {
+		// will fail silently if not supported
+		printf("nVidia::IntitializeNvidia - NvAPI_Initialize error\n");
+		return false;
+	}
+	initialized = true;
+	return true;
+}
+
+void nVidia::ReleaseNvidia()
+{
+	if (!initialized)
+		return;
+
+	if (hSession > 0)
+		NvAPI_DRS_DestroySession(hSession);
+
+	hSession = 0;
+	NvAPI_Unload();
+	initialized = false;
+}
+
+bool nVidia::CreateSession()
+{
+	if (!initialized)
+		return false;
+
+	// (1) Create the session handle to access driver settings
+	hSession = 0;
+	status = NvAPI_DRS_CreateSession(&hSession);
+	if (status != NVAPI_OK) {
+		printf("nVidia::CreateSession : NvAPI_DRS_CreateSession error\n");
+		return false;
+	}
+
+	// (2) load all the system settings into the session
+	status = NvAPI_DRS_LoadSettings(hSession);
+	if (status != NVAPI_OK) {
+		printf("nVidia::CreateSession : NvAPI_DRS_LoadSettings error\n");
+		return false;
+	}
+
+	return true;
+
+}
+
+bool nVidia::LoadBaseProfile()
+{
+	// (3) Obtain the Base profile. Any setting needs to be inside
+	// a profile, putting a setting on the Base Profile enforces it
+	// for all the processes on the system
+	hProfile = 0;
+	status = NvAPI_DRS_GetBaseProfile(hSession, &hProfile);
+	if (status != NVAPI_OK) {
+		printf("nVidia::LoadBaseProfile : NvAPI_DRS_GetBaseProfile error\n");
+		return false;
+	}
+
+	return true;
+
+}
+
+// systemtype  0 - unknown : 1 - laptop     : 2 - desktop
+// gputype     0 - unknown : 1 - integrated : 2 - discrete
+bool nVidia::GetGPUtype(int *systemType, int *gpuType)
+{
+	int systemtype = 0;
+	int gputype = 0;
+
+	NV_SYSTEM_TYPE NVSystemType = NV_SYSTEM_TYPE_UNKNOWN;
+	NV_GPU_TYPE NVGpuType = NV_SYSTEM_TYPE_GPU_UNKNOWN;
+
+	// We need to get the handle for the system's physical GPU.
+	// The NvAPI_EnumPhysicalGPUs function accomplishes this.
+	// We then go through all the handles and use NvAPI_GPU_GetSystemType()
+	// to check if the GPU is a laptop GPU.
+	// If it is, we have to check whether the GPU is discrete
+	// using NvAPI_GPU_GetGPUType(). 
+
+	// For reference, here's the documentation for those NVApi functions:
+	// http://docs.nvidia.com/gameworks/content/gameworkslibrary/coresdk/nvapi/group__gpu.html
+
+	// NVAPI_INTERFACE NvAPI_EnumPhysicalGPUs (NvPhysicalGpuHandle nvGPUHandle[NVAPI_MAX_PHYSICAL_GPUS], NvU32 *pGpuCount)
+	// This function returns an array of physical GPU handles.
+	// Each handle represents a physical GPU present in the system.
+	// That GPU may be part of an SLI configuration, or may not be visible
+	// to the OS directly.
+	// At least one GPU must be present in the system and
+	// running an NVIDIA display driver.
+	// The array nvGPUHandle will be filled with physical GPU handle values.
+	// The returned gpuCount determines how many entries in the array are valid.
+	NvPhysicalGpuHandle nvGPUHandle[NVAPI_MAX_PHYSICAL_GPUS];
+	NvU32 GpuCount = 0;
+	status = NvAPI_EnumPhysicalGPUs(nvGPUHandle, &GpuCount);
+	if (status != NVAPI_OK) {
+		printf("nVidia::GetGPUtype NvAPI_EnumPhysicalGPUs error\n");
+		return false;
+	}
+	
+	// printf("nVidia::GetGPUtype : GPuCount = %d\n", GpuCount);
+
+	// Go through all the handles and use NvAPI_GPU_GetSystemType()
+	// to check if the GPU is a laptop GPU.
+	// NvAPI_GPU_GetSystemType (NvPhysicalGpuHandle hPhysicalGpu, NV_SYSTEM_TYPE * pSystemType)
+	// This function identifies whether the GPU is a notebook GPU or a desktop GPU.
+	// Return values
+	// NVAPI_INVALID_ARGUMENT : hPhysicalGpu or pOutputsMask is NULL
+	// NVAPI_OK	: *pSystemType contains the GPU system type
+	// NVAPI_NVIDIA_DEVICE_NOT_FOUND : No NVIDIA GPU driving a display was found
+	// NVAPI_EXPECTED_PHYSICAL_GPU_HANDLE : hPhysicalGpu was not a physical GPU handle
+	//
+	// NV_SYSTEM_TYPE_UNKNOWN = 0,
+	// NV_SYSTEM_TYPE_LAPTOP = 1,
+	// NV_SYSTEM_TYPE_DESKTOP = 2,
+	for (unsigned int i = 0; i < GpuCount; i++) {
+		if (NvAPI_GPU_GetSystemType(nvGPUHandle[i], &NVSystemType) == NVAPI_OK) {
+			
+			/*
+			printf("System type = %d\n", NVSystemType);
+			if (NVSystemType == NV_SYSTEM_TYPE_UNKNOWN)
+				printf("Unknown System type\n");
+			if (NVSystemType == NV_SYSTEM_TYPE_LAPTOP)
+				printf("Laptop system\n");
+			if (NVSystemType == NV_SYSTEM_TYPE_DESKTOP)
+				printf("Desktop system\n");
+			*/
+
+			if (NVSystemType == NV_SYSTEM_TYPE_LAPTOP) {
+				// It is a laptop.
+				// we have to check whether the GPU is discrete using NvAPI_GPU_GetGPUType()
+				// NVAPI_INTERFACE NvAPI_GPU_GetGPUType(__in NvPhysicalGpuHandle hPhysicalGpu, __inout NV_GPU_TYPE * pGpuType);
+				// This function returns the GPU type(integrated or discrete).
+				//    0 - NV_SYSTEM_TYPE_GPU_UNKNOWN 	
+				//    1 - NV_SYSTEM_TYPE_IGPU : Integrated GPU.
+				//    2 - NV_SYSTEM_TYPE_DGPU : Discrete GPU.
+				//
+				NV_GPU_TYPE NVGpuType = NV_SYSTEM_TYPE_GPU_UNKNOWN;
+				status = NvAPI_GPU_GetGPUType(nvGPUHandle[i], &NVGpuType);
+				if (status == NVAPI_OK) {
+					/*
+					printf("GpuType = %d\n", NVGpuType);
+					if (NVGpuType == NV_SYSTEM_TYPE_GPU_UNKNOWN)
+						printf("Unknown GPU type\n");
+					if (NVGpuType == NV_SYSTEM_TYPE_IGPU)
+						printf("Integrated GPU\n");
+					if (NVGpuType == NV_SYSTEM_TYPE_GPU_UNKNOWN)
+						printf("Discrete GPU\n");
+					*/
+					// TODO : what does integrated mean
+					// Using the integrate GPU or has an integrated GPU ?
+					// if (NVGpuType == NV_SYSTEM_TYPE_IGPU) {
+						// bintegrated = true;
+					// }
+				}
+			}
+		}
+	}
+
+	*systemType = (int)NVSystemType;
+	*gpuType = (int)NVGpuType;
+	
+	return true;
+
+}

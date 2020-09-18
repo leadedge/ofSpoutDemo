@@ -555,6 +555,8 @@ void ofApp::keyPressed(int key) {
 
 	if (key == ' ') {
 		bShowInfo = !bShowInfo;
+		// Handle menu check mark
+		menu->SetPopupItem("Show info", bShowInfo);
 	}
 
 }
@@ -1244,7 +1246,7 @@ bool ofApp::DoDiagnostics()
 			// Get the current Optimus NVIDIA setting from the NVIDIA base profile
 			// This will just fail for unsupported hardware and return -1
 			// 0 - nvidia : 1 - integrated : 2 - auto-select, -1 fail
-			NvidiaMode = g_NvApi.GetNVIDIA(&NvidiaDriverVersion, NvidiaBuildBranchString);
+			NvidiaMode = g_NvApi.GetNvidiaGPU(&NvidiaDriverVersion, NvidiaBuildBranchString);
 			if (NvidiaMode >= 0) {
 				if (NvidiaMode == 0)
 					strcat_s(gldxcaps, 1024, "Optimus using NVIDIA processor\r\n");
