@@ -1,38 +1,38 @@
 /*
 
-	Spout OpenFrameworks Demo program
+    Spout OpenFrameworks Demo program
 
-	Spout 2.007
-	OpenFrameworks 11
-	Visual Studio 2017
+    Spout 2.007
+    OpenFrameworks 11
+    Visual Studio 2017
 
-	Copyright (C) 2020 Lynn Jarvis.
+    Copyright (C) 2020 Lynn Jarvis.
 
-	This program can be used to test Spout development code.
-	It requires the files from the Spout SDK "develop" branch as detailed below.
+    This program can be used to test Spout development code.
+    It requires the files from the Spout SDK "develop" branch as detailed below.
 
-	Uses the ofxSkybox addon
-	https://github.com/kalwalt/ofxSkyBox
+    Uses the ofxSkybox addon
+    https://github.com/kalwalt/ofxSkyBox
     Created by kalwalt alias Walter Perdan on 27/12/11
-	Copyright 2011 http://www.kalwaltart.it/ All rights reserved.
+    Copyright 2011 http://www.kalwaltart.it/ All rights reserved.
 
-	Uses the ofxWinMenu addon
-	https://github.com/leadedge/ofxWinMenu
+    Uses the ofxWinMenu addon
+    https://github.com/leadedge/ofxWinMenu
 
-	The source for both of these is modified and included with the project.
+    The source for both of these is modified and included with the project.
 
     Setup required for For Visual Studio 2017 and Openframeworks 11.
 
-	1) Download Openframeworks for Windows and Visual Studio
+    1) Download Openframeworks for Windows and Visual Studio
 	   https://openframeworks.cc/download/
-	2) Unzip the files to get a folder containing Openframeworks
+    2) Unzip the files to get a folder containing Openframeworks
        e.g. "of_v0.11.0_vs2017_release"
     3) Copy the folder to a convenient location and rename it as you wish
        e.g. somefolder\OPENFRAMEWORKS11
     4) Download the "develop" branch of the Spout SDK
        https://github.com/leadedge/Spout2/tree/develop
-	5) Copy the entire "SpoutSDK folder into the Openframeworks "apps" folder
-	6) Download the "SpoutDemo" repository
+    5) Copy the entire "SpoutSDK folder into the Openframeworks "apps" folder
+    6) Download the "SpoutDemo" repository
     7) Copy the "ofSpoutDemo" folder and contents to the Openframeworks "apps\myApps" folder.
 
     You will then have a folder structure as follows :
@@ -80,8 +80,8 @@
 	As many comments as possible are included in the source files.
 
 
-	=========================================================================
-	This program is free software: you can redistribute it and/or modify
+    =========================================================================
+    This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
@@ -93,7 +93,8 @@
 
     You should have received a copy of the GNU Lesser General Public License
     along with this program. If not, see <http://www.gnu.org/licenses/>.
-	=========================================================================
+    =========================================================================
+
 */
 #include "ofApp.h"
 #include "resource.h"
@@ -259,7 +260,11 @@ void ofApp::setup(){
 	for (int i = 0; i < adaptercount; i++) {
 		receiver.GetAdapterName(i, name, 64);
 		adaptername[i] = name;
+
+		printf("%s\n", adaptername[i].c_str());
+
 	}
+
 	// Get the current user-set share mode from the registry
 	// (0 - texture : 1 - memory : 2 - auto)
 	shareMode = receiver.GetShareMode();
@@ -362,29 +367,6 @@ void ofApp::draw() {
 			}
 			str = text;
 			myFont.drawString(str, 10, 30);
-
-			// Graphics adapter details
-			//    o	Adapter name
-			//    o User selected sharing mode
-			//    o Compatibility sharing mode
-
-			// Get the current graphics adapter index and name
-			str = ofToString(currentadapter);
-			str += " : ";
-			str += adaptername[currentadapter];
-
-			// Memoryshare
-			if (shareMode == 1) {
-				str += " : Memory share";
-			}
-			// Texture share (Auto share mode to be removed)
-			else {
-				if (receiver.GetMemoryShare())
-					str += " : Memory share compatible";
-				else
-					str += " : Texture share";
-			}
-			myFont.drawString(str, 10, 52);
 			
 			// If the receiver and sender are using different adapters
 			// show the sender graphics adapter index and name.
@@ -396,13 +378,34 @@ void ofApp::draw() {
 				str += adaptername[senderadapter];
 				myFont.drawString(str, 10, 74);
 			}
-
 			myFont.drawString("RH click to select sender", 10, ofGetHeight() - 20);
 		}
 		else {
 			myFont.drawString("No sender detected", 10, 30);
 		}
 
+		// Graphics adapter details
+		//    o	Adapter name
+		//    o User selected sharing mode
+		//    o Compatibility sharing mode
+
+		// Get the current graphics adapter index and name
+		str = ofToString(currentadapter);
+		str += " : ";
+		str += adaptername[currentadapter];
+
+		// Memoryshare
+		if (shareMode == 1) {
+			str += " : Memory share";
+		}
+		// Texture share (Auto share mode to be removed)
+		else {
+			if (receiver.GetMemoryShare())
+				str += " : Memory share compatible";
+			else
+				str += " : Texture share";
+		}
+		myFont.drawString(str, 10, 52);
 
 	} // endif show info
 
