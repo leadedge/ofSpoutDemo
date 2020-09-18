@@ -137,7 +137,7 @@ void ofApp::setup(){
 	
 	// OpenSpoutConsole(); // Empty console for debugging
 	// EnableSpoutLog(); // Log to console
-	// EnableSpoutLogFile(senderName); // Log to file
+	EnableSpoutLogFile(senderName); // Log to file
 
 	// Instance
 	g_hInstance = GetModuleHandle(NULL);
@@ -149,13 +149,9 @@ void ofApp::setup(){
 	SetClassLongA(g_hWnd, GCLP_HICON, (LONG)LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
 
 	// Load a font rather than the default
-	if (!myFont.load("fonts/verdana.ttf", 12, true, true))
-		printf("Font not loaded\n");
-
-	// Remove maximize button
-	DWORD dwStyle = GetWindowLong(g_hWnd, GWL_STYLE);
-	g_dwStyle = dwStyle ^= WS_MAXIMIZEBOX;
-	SetWindowLong(g_hWnd, GWL_STYLE, g_dwStyle);
+	// if (!myFont.load("fonts/verdana.ttf", 12, true, true))
+	if (!myFont.load("fonts/DejaVuSans.ttf", 12, true, true))
+	  printf("Font not loaded\n");
 
 	// Disable escape key exit
 	ofSetEscapeQuitsApp(false);
@@ -260,9 +256,7 @@ void ofApp::setup(){
 	for (int i = 0; i < adaptercount; i++) {
 		receiver.GetAdapterName(i, name, 64);
 		adaptername[i] = name;
-
-		printf("%s\n", adaptername[i].c_str());
-
+		// printf("%s\n", adaptername[i].c_str());
 	}
 
 	// Get the current user-set share mode from the registry
@@ -368,17 +362,22 @@ void ofApp::draw() {
 			str = text;
 			myFont.drawString(str, 10, 30);
 			
-			// If the receiver and sender are using different adapters
+			// If the receiver and sender are using different adapters,
 			// show the sender graphics adapter index and name.
+			// The sender adapter index retrieved could be anything for < 2.007.
+			// Make sure it's in the range of adapters and has a name.
 			senderadapter = receiver.spout.interop.GetSenderAdapter(receiver.GetSenderName());
-			if (senderadapter != currentadapter) {
-				str = "Sender adapter ";
-				str += ofToString(senderadapter);
-				str += " : ";
-				str += adaptername[senderadapter];
-				myFont.drawString(str, 10, 74);
+			if (senderadapter >= 0 
+				&& senderadapter < adaptercount
+				&& senderadapter != currentadapter
+				&& !empty(adaptername[senderadapter])) {
+					str = "Sender adapter ";
+					str += ofToString(senderadapter);
+					str += " : ";
+					str += adaptername[senderadapter];
+					myFont.drawString(str, 10, 74);
 			}
-			myFont.drawString("RH click to select sender", 10, ofGetHeight() - 20);
+			myFont.drawString("RH click - select sender\n'f'  full screen : '  '  hide info", 10, ofGetHeight() - 30);
 		}
 		else {
 			myFont.drawString("No sender detected", 10, 30);
@@ -564,6 +563,7 @@ void ofApp::keyPressed(int key) {
 //--------------------------------------------------------------
 void ofApp::windowResized(int w, int h) 
 {
+
 #ifndef BUILDRECEIVER
 	if (w > 0 && h > 0) {
 		// Update the sender dimensions to match the window size
