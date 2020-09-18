@@ -345,7 +345,7 @@ void ofApp::draw() {
 	else
 		ofClear(10, 100, 140, 255);
 
-	if (bShowInfo) {
+	if (bShowInfo && !bFullScreen) {
 
 		if (receiver.IsConnected()) {
 
@@ -550,9 +550,12 @@ void ofApp::keyPressed(int key) {
 		bFullScreen = !bFullScreen;
 		doFullScreen(bFullScreen);
 	}
-#else
-	UNREFERENCED_PARAMETER(key);
+
 #endif
+
+	if (key == ' ') {
+		bShowInfo = !bShowInfo;
+	}
 
 }
 
