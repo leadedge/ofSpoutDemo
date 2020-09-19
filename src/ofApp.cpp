@@ -129,11 +129,12 @@ void ofApp::setup(){
 	ofBackground(0, 0, 0);
 
 #ifdef BUILDRECEIVER
-	strcpy_s(senderName, 256, "Spout Receiver");
+	strcpy_s(senderName, 256, "ofSpoutReceiver");
+	ofSetWindowTitle("Spout Receiver");
 #else
-	strcpy_s(senderName, 256, "Spout Sender"); // The sender name
+	strcpy_s(senderName, 256, "ofSpoutSender"); // The sender name
+	ofSetWindowTitle("Spout Sender");
 #endif
-	ofSetWindowTitle(senderName); // show it on the title bar
 	
 	// OpenSpoutConsole(); // Empty console for debugging
 	// EnableSpoutLog(); // Log to console
@@ -149,7 +150,6 @@ void ofApp::setup(){
 	SetClassLongA(g_hWnd, GCLP_HICON, (LONG)LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
 
 	// Load a font rather than the default
-	// if (!myFont.load("fonts/verdana.ttf", 12, true, true))
 	if (!myFont.load("fonts/DejaVuSans.ttf", 12, true, true))
 	  printf("Font not loaded\n");
 
@@ -279,6 +279,11 @@ void ofApp::setup(){
 	shareMode = sender.GetShareMode();
 #endif
 
+	// Disable graphics adapter selection for memoryshare
+	if (shareMode == 1) {
+		menu->EnablePopupItem("Graphics Adapter", false);
+	}
+
 	// Skybox setup
 	skybox.load();
 
@@ -305,6 +310,13 @@ void ofApp::update() {
 		myTexture.allocate(receiver.GetSenderWidth(), receiver.GetSenderHeight(), GL_RGBA);
 	}
 #else
+
+	// Double click reset of easycam position
+	ofVec3f pos = easycam.getPosition();
+	if (pos.z > 0.0f) {
+		easycam.setPosition(ofVec3f(0, 0, 0));
+	}
+
 	// senderWidth and senderHeight are reset when the window is resized
 	// Update the sending fbo dimensions
 	// The sender is updated on the next call to SendTexture (2.007 only)
@@ -1151,7 +1163,7 @@ INT_PTR CALLBACK Capabilities(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
 bool ofApp::DoDiagnostics()
 {
 
-	SpoutLogNotice("Spout Demo Program : DoDiagnostics");
+	SpoutLogNotice("\nSpout Demo Program : DoDiagnostics\n");
 
 	// Copied from SpoutSettings
 	bool bMemory = false;
@@ -1172,7 +1184,7 @@ bool ofApp::DoDiagnostics()
 	if (CheckForDirectX9c()) {
 		strcat_s(gldxcaps, 1024, "DirectX 9c installed\r\n");
 		// DirectX 9 installed - try to open a DX9 device
-		bDX9available = spout->interop.OpenDirectX(g_hWnd, true);
+		bDX9available = spout->interop.OpenDirectX9(g_hWnd);
 		if (!bDX9available) {
 			strcat_s(gldxcaps, 1024, "Warning : DirectX 9 device not available\r\n");
 			bDX9 = false;
@@ -1182,7 +1194,7 @@ bool ofApp::DoDiagnostics()
 			strcat_s(gldxcaps, 1024, "DirectX 9 device available\r\n");
 		}
 		// Try to open a DX11 device
-		bDX11available = spout->interop.OpenDirectX(g_hWnd, false);
+		bDX11available = spout->interop.OpenDirectX11();
 		if (!bDX11available) {
 			strcat_s(gldxcaps, 1024, "Warning : DirectX 11 device not available\r\n");
 		}
@@ -1195,7 +1207,7 @@ bool ofApp::DoDiagnostics()
 		strcat_s(gldxcaps, 1024, "DirectX 9.0c not installed\r\n");
 		strcat_s(gldxcaps, 1024, "DirectX 9 device not available\r\n");
 		bDX9 = false;
-		bDX11available = spout->interop.OpenDirectX(NULL, false);
+		bDX11available = spout->interop.OpenDirectX11();
 		if (!bDX11available) {
 			strcat_s(gldxcaps, 1024, "DirectX 11 device not available\r\n");
 		}

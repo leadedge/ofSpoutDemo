@@ -92,6 +92,7 @@ class ofApp : public ofBaseApp{
 		char NvidiaBuildBranchString[128];
 		unsigned int DriverPrimary = 0;
 		unsigned int DriverSecondary = 0;
+		unsigned int prevClickTime = 0;
 
 		ofTrueTypeFont myFont;
 		ofxWinMenu * menu;
