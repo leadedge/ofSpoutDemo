@@ -18,7 +18,9 @@
 // 11.02.17 - Return driver number and driver-branch string for GetNvidiaGPU
 // 31.08.20 - Add local functions for Nvidia
 //			  Cleanup thoughout
-//
+// 19.09.20 - Correct addtional return in GetNvidiaSystem
+//			  Removed unused local variables in GetGPUtype
+//			  Removed duplicate NVGpuType variable in GetGPUtype
 
 nVidia::nVidia() {
 	hSession = 0;
@@ -179,8 +181,6 @@ bool nVidia::GetNvidiaSystem(int *systemType, int *gpuType)
 
 	*systemType = systemtype;
 	*gpuType = gputype;
-
-	return true;
 
 	ReleaseNvidia();
 
@@ -672,9 +672,6 @@ bool nVidia::LoadBaseProfile()
 // gputype     0 - unknown : 1 - integrated : 2 - discrete
 bool nVidia::GetGPUtype(int *systemType, int *gpuType)
 {
-	int systemtype = 0;
-	int gputype = 0;
-
 	NV_SYSTEM_TYPE NVSystemType = NV_SYSTEM_TYPE_UNKNOWN;
 	NV_GPU_TYPE NVGpuType = NV_SYSTEM_TYPE_GPU_UNKNOWN;
 
@@ -742,7 +739,7 @@ bool nVidia::GetGPUtype(int *systemType, int *gpuType)
 				//    1 - NV_SYSTEM_TYPE_IGPU : Integrated GPU.
 				//    2 - NV_SYSTEM_TYPE_DGPU : Discrete GPU.
 				//
-				NV_GPU_TYPE NVGpuType = NV_SYSTEM_TYPE_GPU_UNKNOWN;
+				NVGpuType = NV_SYSTEM_TYPE_GPU_UNKNOWN;
 				status = NvAPI_GPU_GetGPUType(nvGPUHandle[i], &NVGpuType);
 				if (status == NVAPI_OK) {
 					/*
