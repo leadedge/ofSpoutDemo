@@ -137,7 +137,7 @@ void ofApp::setup(){
 #endif
 	
 	// OpenSpoutConsole(); // Empty console for debugging
-	// EnableSpoutLog(); // Log to console
+	EnableSpoutLog(); // Log to console
 	EnableSpoutLogFile(senderName); // Log to file
 
 	// Instance
@@ -303,6 +303,7 @@ void ofApp::setup(){
 
 //--------------------------------------------------------------
 void ofApp::update() {
+
 #ifdef BUILDRECEIVER
 	// If IsUpdated() returns true, the sender size has changed
 	// and the receiving texture must be re-sized.
@@ -332,6 +333,8 @@ void ofApp::update() {
 		
 
 #endif
+
+
 }
 
 //--------------------------------------------------------------
@@ -376,13 +379,8 @@ void ofApp::draw() {
 			
 			// If the receiver and sender are using different adapters,
 			// show the sender graphics adapter index and name.
-			// The sender adapter index retrieved could be anything for < 2.007.
-			// Make sure it's in the range of adapters and has a name.
 			senderadapter = receiver.spout.interop.GetSenderAdapter(receiver.GetSenderName());
-			if (senderadapter >= 0 
-				&& senderadapter < adaptercount
-				&& senderadapter != currentadapter
-				&& !empty(adaptername[senderadapter])) {
+			if (senderadapter != currentadapter	&& !empty(adaptername[senderadapter])) {
 					str = "Sender adapter ";
 					str += ofToString(senderadapter);
 					str += " : ";
@@ -582,6 +580,9 @@ void ofApp::windowResized(int w, int h)
 		senderWidth = w;
 		senderHeight = h;
 	}
+#else
+	UNREFERENCED_PARAMETER(w);
+	UNREFERENCED_PARAMETER(h);
 #endif
 
 }

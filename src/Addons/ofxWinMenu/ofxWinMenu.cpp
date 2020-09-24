@@ -276,7 +276,6 @@ bool ofxWinMenu::EnablePopupItem(string ItemName, bool bEnabled)
 // ofApp Function for return of memu item selection
 void ofxWinMenu::CreateMenuFunction(void(ofApp::*function)(string title, bool bChecked))
 {
-	// printf("ofxWinMenu::CreateMenuFunction(0x%x)\n", (unsigned int)function);
 	pAppMenuFunction = function; // Return function in ofApp
 }
 

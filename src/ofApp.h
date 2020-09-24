@@ -27,8 +27,8 @@
 #include "Nvapi\SpoutOptimus.h" // NVIDIA profile settings
 #include "resource.h"
 
-// Change to create a sender or a receiver
-// #define BUILDRECEIVER
+#define BUILDRECEIVER
+#define BUILDRECEIVER
 
 class ofApp : public ofBaseApp{
 	public:
