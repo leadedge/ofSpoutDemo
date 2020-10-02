@@ -27,8 +27,7 @@
 #include "Nvapi\SpoutOptimus.h" // NVIDIA profile settings
 #include "resource.h"
 
-#define BUILDRECEIVER
-#define BUILDRECEIVER
+// #define BUILDRECEIVER
 
 class ofApp : public ofBaseApp{
 	public:

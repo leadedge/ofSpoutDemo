@@ -11,13 +11,11 @@
 #define IDC_ABOUT_TEXT      400
 #define IDC_SPOUT_URL       401
 #define IDC_NAMETEXT        402
-#define IDC_ADAPTERS        403
-#define IDC_CAPSTEXT        404
-#define IDC_COPY            405
-#define IDC_LOG             406
+#define IDC_CAPSTEXT        403
+#define IDC_COPY            404
+#define IDC_LOG             405
 
 #define IDD_ABOUTBOX        500
 #define IDD_CAPSBOX         501
 #define IDD_NAMEBOX         502
-#define IDD_ADAPTERBOX      503
 

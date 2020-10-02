@@ -104,13 +104,6 @@
 INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam); // enter a sender name 
 static PSTR szText;
 
-INT_PTR  CALLBACK AdapterProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
-static std::string adaptername[10];
-static int adaptercount = 0;
-static int currentadapter = 0;
-static int selectedadapter = 0;
-static int senderadapter = 0;
-
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 static int spoutVersion = 0;
 static HINSTANCE g_hInstance;
@@ -137,7 +130,7 @@ void ofApp::setup(){
 #endif
 	
 	// OpenSpoutConsole(); // Empty console for debugging
-	EnableSpoutLog(); // Log to console
+	// EnableSpoutLog(); // Log to console
 	EnableSpoutLogFile(senderName); // Log to file
 
 	// Instance
@@ -187,7 +180,6 @@ void ofApp::setup(){
 #ifndef BUILDRECEIVER
 	menu->AddPopupItem(hPopup, "Sender name", false, false);
 #endif
-	menu->AddPopupItem(hPopup, "Graphics Adapter", false, false);
 	// Final File popup menu item is "Exit" - add a separator before it
 	menu->AddPopupSeparator(hPopup);
 	menu->AddPopupItem(hPopup, "Exit", false, false);
@@ -243,46 +235,20 @@ void ofApp::setup(){
 	// Create an RGBA fbo for texture transfers
 	myFbo.allocate(senderWidth, senderHeight, GL_RGBA);
 
-	char name[64];
 #ifdef BUILDRECEIVER
 	// Allocate an RGBA texture to receive from the sender
 	// It can be resized later to match the sender - see Update()
 	myTexture.allocate(senderWidth, senderHeight, GL_RGBA);
-	// Get the current graphics adapter index
-	currentadapter = receiver.GetAdapter();
-	// Create an adapter name list for the dialog
-	adaptercount = receiver.GetNumAdapters();
-	adaptername->clear();
-	for (int i = 0; i < adaptercount; i++) {
-		receiver.GetAdapterName(i, name, 64);
-		adaptername[i] = name;
-		// printf("%s\n", adaptername[i].c_str());
-	}
-
 	// Get the current user-set share mode from the registry
 	// (0 - texture : 1 - memory : 2 - auto)
 	shareMode = receiver.GetShareMode();
 #else
 	// Give the sender a name (if no name is specified, the executable name is used)
 	sender.SetSenderName(senderName);
-	// Get the current graphics adapter index
-	currentadapter = sender.GetAdapter();
-	// Create an adapter name list for the dialog
-	adaptercount = sender.GetNumAdapters();
-	adaptername->clear();
-	for (int i = 0; i < adaptercount; i++) {
-		sender.GetAdapterName(i, name, 64);
-		adaptername[i] = name;
-	}
 	// Get the current user-set share mode from the registry
 	// (0 - texture : 1 - memory : 2 - auto)
 	shareMode = sender.GetShareMode();
 #endif
-
-	// Disable graphics adapter selection for memoryshare
-	if (shareMode == 1) {
-		menu->EnablePopupItem("Graphics Adapter", false);
-	}
 
 	// Skybox setup
 	skybox.load();
@@ -351,8 +317,6 @@ void ofApp::draw() {
 	// ReceiveTexture connects to and receives from a sender
 	if(receiver.ReceiveTexture(myTexture.getTextureData().textureID, myTexture.getTextureData().textureTarget))
 		myTexture.draw(0, 0, ofGetWidth(), ofGetHeight());
-	else
-		ofClear(10, 100, 140, 255);
 
 	if (bShowInfo && !bFullScreen) {
 
@@ -376,43 +340,23 @@ void ofApp::draw() {
 			}
 			str = text;
 			myFont.drawString(str, 10, 30);
-			
-			// If the receiver and sender are using different adapters,
-			// show the sender graphics adapter index and name.
-			senderadapter = receiver.spout.interop.GetSenderAdapter(receiver.GetSenderName());
-			if (senderadapter != currentadapter	&& !empty(adaptername[senderadapter])) {
-					str = "Sender adapter ";
-					str += ofToString(senderadapter);
-					str += " : ";
-					str += adaptername[senderadapter];
-					myFont.drawString(str, 10, 74);
-			}
+	
 			myFont.drawString("RH click - select sender\n'f'  full screen : '  '  hide info", 10, ofGetHeight() - 30);
 		}
 		else {
 			myFont.drawString("No sender detected", 10, 30);
 		}
 
-		// Graphics adapter details
-		//    o	Adapter name
-		//    o User selected sharing mode
-		//    o Compatibility sharing mode
-
-		// Get the current graphics adapter index and name
-		str = ofToString(currentadapter);
-		str += " : ";
-		str += adaptername[currentadapter];
-
 		// Memoryshare
 		if (shareMode == 1) {
-			str += " : Memory share";
+			str = "Memory share";
 		}
 		// Texture share (Auto share mode to be removed)
 		else {
 			if (receiver.GetMemoryShare())
-				str += " : Memory share compatible";
+				str = "Memory share compatible";
 			else
-				str += " : Texture share";
+				str = "Texture share";
 		}
 		myFont.drawString(str, 10, 52);
 
@@ -483,26 +427,16 @@ void ofApp::draw() {
 		}
 		myFont.drawString(str, 20, 30);
 
-		// Graphics adapter details
-		//    o	Adapter name
-		//    o User selected sharing mode
-		//    o Compatibility sharing mode
-
-		// Get the current graphics adapter index and name
-		str = ofToString(currentadapter);
-		str += " : ";
-		str += adaptername[currentadapter];
-
 		// Memoryshare
 		if (shareMode == 1) {
-				str += " : Memory share";
+				str = "Memory share";
 		}
 		// Texture share (Auto share mode to be removed)
 		else {
 			if (sender.GetMemoryShare())
-				str += " : Memory share compatible";
+				str = "Memory share compatible";
 			else
-				str += " : Texture share";
+				str = "Texture share";
 		}
 
 		myFont.drawString(str, 20, 52);
@@ -617,10 +551,6 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 		}
 	}
 #endif
-
-	if (title == "Graphics Adapter") {
-		SelectAdapter();
-	}
 
 	if (title == "Exit") {
 		ofExit(); // Quit the application
@@ -829,139 +759,6 @@ INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 }
 
 
-
-void ofApp::SelectAdapter()
-{
-	// OpenGL/DirectX interop compatibility is unknown for the selected adapter unless tested.
-	// Either use Memory share to bypass the test or the share mode will switch if necessary.
-	// The adapter name list should not have changed since the program started
-
-	#ifdef BUILDRECEIVER
-		shareMode = receiver.GetShareMode(); // User selected share mode
-		currentadapter = receiver.GetAdapter(); // Get the current adapter index
-		selectedadapter = currentadapter; // The index to be selected in the dialog
-	#else
-		shareMode = sender.GetShareMode(); // User selected share mode
-		currentadapter = sender.GetAdapter(); // Get the current adapter index
-		selectedadapter = currentadapter; // The index to be selected in the dialog
-	#endif
-
-	// Show the dialog box 
-	int retvalue = (int)DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_ADAPTERBOX), g_hWnd, (DLGPROC)AdapterProc);
-	
-	if (retvalue != 0) {
-		// OK - adapter index (selectedadapter) has been selected
-#ifdef BUILDRECEIVER
-		// Set the selected adapter if different
-		// A new sender will be detected on the first ReceiveTexture call (Requires 2.007)
-		if (selectedadapter != currentadapter) {
-			// A new sender using the selected adapter will be created
-			// on the first SendTexture call (Requires 2.007)
-			receiver.ReleaseReceiver();
-			// Update the share mode flags for repeats
-			// The application could have changed to memory share
-			// the last time an adapter was selected.
-			receiver.SetShareMode(shareMode);
-			if (!receiver.SetAdapter(selectedadapter)) {
-				// SetAdapter returns to the primary adapter for failure
-				// Refer to error logs for diagnostics
-				MessageBoxA(NULL, "Could not select graphics adapter", "SpoutDemo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-				// Set the adapter back to what it was (the compatibility test is repeated)
-				receiver.SetAdapter(currentadapter);
-			}
-			else {
-				// Change the application current adapter index to the one selected
-				// This will take effect when the sender is re-created
-				currentadapter = selectedadapter;
-			}
-			// If the user selected Texture share mode, the compatibility test
-			// could have switched the application to memory share.
-			// This can be tested with : GetMemoryShare();
-		}
-#else
-		// Set the selected adapter if different
-		if (selectedadapter != currentadapter) {
-			// A new sender using the selected adapter will be created
-			// on the first SendTexture call (Requires 2.007)
-			sender.ReleaseSender();
-			// Update the share mode flags for repeats
-			// The application could have changed to memory share
-			// the last time an adapter was selected.
-			sender.SetShareMode(shareMode);
-			if (!sender.SetAdapter(selectedadapter)) {
-				// SetAdapter returns to the primary adapter for failure
-				// Refer to error logs for diagnostics
-				MessageBoxA(NULL, "Could not select graphics adapter", "SpoutDemo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-				// Set the adapter back to what it was (the compatibility test is repeated)
-				sender.SetAdapter(currentadapter);
-			}
-			else {
-				// Change the application current adapter index to the one selected
-				// This will take effect when the sender is re-created
-				currentadapter = selectedadapter;
-			}
-			// If the user selected Texture share mode, the compatibility test
-			// could have switched the application to memory share.
-			// This can be tested with : GetMemoryShare();
-		}
-#endif
-	}
-
-}
-
-// Message handler for selecting adapter
-INT_PTR  CALLBACK AdapterProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	UNREFERENCED_PARAMETER(lParam); // suppress warning
-
-	HWND hwndList = NULL;
-	int i = 0;
-	char name[128];
-
-	switch (message) {
-
-	case WM_INITDIALOG:
-		// Adapter combo selection
-		hwndList = GetDlgItem(hDlg, IDC_ADAPTERS);
-		if (adaptercount < 10) {
-			for (i = 0; i < adaptercount; i++) {
-				sprintf_s(name, 128, "%d : %s", i, adaptername[i].c_str());
-				SendMessageA(hwndList, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)name);
-			}
-			// Display an initial item in the selection field
-			SendMessageA(hwndList, CB_SETCURSEL, (WPARAM)currentadapter, (LPARAM)0);
-		}
-		return TRUE;
-
-	case WM_COMMAND:
-
-		// Combo box selection
-		if (HIWORD(wParam) == CBN_SELCHANGE) {
-			selectedadapter = (int)SendMessageA((HWND)lParam, (UINT)CB_GETCURSEL, (WPARAM)0, (LPARAM)0);
-		}
-		// Drop through
-
-		switch (LOWORD(wParam)) {
-
-		case IDOK:
-			// Return the selected adapter index
-			EndDialog(hDlg, 1);
-			break;
-
-		case IDCANCEL:
-			// User pressed cancel.
-			// Reset the selected index and take down dialog box.
-			selectedadapter = currentadapter;
-			EndDialog(hDlg, 0);
-			return (INT_PTR)TRUE;
-
-		default:
-			return (INT_PTR)FALSE;
-		}
-	}
-
-	return (INT_PTR)FALSE;
-}
 
 // Message handler for About box
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
