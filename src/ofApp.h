@@ -2,7 +2,7 @@
 
 	Spout OpenFrameworks Demo program
 
-	Copyright (C) 2020 Lynn Jarvis.
+	Copyright (C) 2020-2021 Lynn Jarvis.
 
 	This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -20,14 +20,22 @@
 */
 #pragma once
 
+#define BUILDRECEIVER
+
 #include "ofMain.h"
-#include "..\apps\SpoutSDK\Spout.h"
 #include "Addons\ofxSkybox\ofxSkyBox.h" // Skybox addon
 #include "Addons\ofxWinMenu\ofxWinMenu.h" // Windows menu addon
-#include "Nvapi\SpoutOptimus.h" // NVIDIA profile settings
 #include "resource.h"
 
-// #define BUILDRECEIVER
+#ifdef BUILDRECEIVER
+#include "..\apps\SpoutGL\SpoutReceiver.h"
+#else
+#include "..\apps\SpoutGL\SpoutSender.h"
+#endif
+
+// For about box graphics adapter display
+static int adapterIndex; // Current graphics adapter index
+static char adapterName[256]; // Current graphics adapter name
 
 class ofApp : public ofBaseApp{
 	public:
@@ -45,12 +53,10 @@ class ofApp : public ofBaseApp{
 #else
 		SpoutSender sender;
 #endif
-		bool bInitialized = false; // TODO
+
 		char senderName[256];  // Sender name
 		unsigned int senderWidth; // Dimensions of the sender can be independent
 		unsigned int senderHeight; // of the application window if using an fbo
-		bool bMemoryMode; // Memory or texture share user selected
-		int shareMode; // Share mode selected by the user (0, 1, 2 : texture,memory,auto)
 
 		ofImage myBoxImage;    // Image for the 3D demo
 		ofFbo myFbo;           // For texture sharing
@@ -73,25 +79,7 @@ class ofApp : public ofBaseApp{
 		
 		void appMenuFunction(string title, bool bChecked);
 		void doFullScreen(bool bFullscreen);
-		bool EnterSenderName(char *SenderName);
-		void SelectAdapter();
-
-		// for diagnostics
-		nVidia g_NvApi;
-		bool DoDiagnostics();
-		bool GLDXready(bool bDX9);
-		bool CheckForDirectX9c();
-		void trim(char* s);
-
-		int g_ThreadedOptimization = 0;
-		bool bLaptop = false; // NVAPI detection of a laptop
-		bool bIntegrated = false; // Laptop using integrated GPU
-		int NvidiaMode = -1; // Optimus graphics mode
-		unsigned int NvidiaDriverVersion = 0; // Driver Version
-		char NvidiaBuildBranchString[128];
-		unsigned int DriverPrimary = 0;
-		unsigned int DriverSecondary = 0;
-		unsigned int prevClickTime = 0;
+		bool EnterSenderName(char *SenderName, char *caption);
 
 		ofTrueTypeFont myFont;
 		ofxWinMenu * menu;

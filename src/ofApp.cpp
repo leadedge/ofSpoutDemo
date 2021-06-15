@@ -6,10 +6,10 @@
     OpenFrameworks 11
     Visual Studio 2017
 
-    Copyright (C) 2020 Lynn Jarvis.
+    Copyright (C) 2020-2021 Lynn Jarvis.
 
     This program can be used to test Spout development code.
-    It requires the files from the Spout SDK "develop" branch as detailed below.
+    Not for public use. See GitHub user project (https://github.com/leadedge/ofSpoutDemo)
 
     Uses the ofxSkybox addon
     https://github.com/kalwalt/ofxSkyBox
@@ -19,66 +19,7 @@
     Uses the ofxWinMenu addon
     https://github.com/leadedge/ofxWinMenu
 
-    The source for both of these is modified and included with the project.
-
-    Setup required for For Visual Studio 2017 and Openframeworks 11.
-
-    1) Download Openframeworks for Windows and Visual Studio
-	   https://openframeworks.cc/download/
-    2) Unzip the files to get a folder containing Openframeworks
-       e.g. "of_v0.11.0_vs2017_release"
-    3) Copy the folder to a convenient location and rename it as you wish
-       e.g. somefolder\OPENFRAMEWORKS11
-    4) Download the "develop" branch of the Spout SDK
-       https://github.com/leadedge/Spout2/tree/develop
-    5) Copy the entire "SpoutSDK folder into the Openframeworks "apps" folder
-    6) Download the "SpoutDemo" repository
-    7) Copy the "ofSpoutDemo" folder and contents to the Openframeworks "apps\myApps" folder.
-
-    You will then have a folder structure as follows :
-
-    OPENFRAMEWORKS11
-        addons
-        examples
-        apps
-            SpoutSDK <- the Spout SDK source files
-            myApps
-               emptyExample <- Openframeworks example template
-			   ofSpoutDemo <- the ofSpoutDemo project folder
-			       ofSpoutDemo.sln
-			       ofSpoutDemo.vcxproj
-			       ofSpoutDemo.vcxproj.filters
-			       src <- source files
-                       Addons <- Modifed source of addons
-                           ofxSkyBox
-                           ofxWinMenu
-		           bin <- executable and required dlls
-                       Data <- application data
-					       fonts
-					       images
-					       shaders
-
-    Open "ofSpoutDemo.sln" with Visual Studio 2017 and set to "Release"
-
-	The first time you use Openframeworks you have to compile the library
-	RH click on "openframeworksLib" - Build
-		when it is compiled :
-	RH click on "ofSpoutDemo" - Build
-		ofSpoutDemo.exe will be in the "bin" folder
-	Rename it as required. For example : ofSpoutSender.exe or ofSpoutReceiver.exe
-
-	Build options :
-
-	You can build the project either as a sender or receiver
-	Find in ofApp.h :
-		// Change to create a sender or a receiver
-		// #define BUILDRECEIVER
-
-	Modifications :
-
-	The code may contain experimental functions which are not documented
-	As many comments as possible are included in the source files.
-
+	15.06.21 - Add image snapshot with F12 key for receiver
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -101,20 +42,14 @@
 
 // DIALOGS
 
-INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam); // enter a sender name 
+static INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam); // enter a sender name 
 static PSTR szText;
+static PSTR szCaption;
 
-INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+static INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 static int spoutVersion = 0;
 static HINSTANCE g_hInstance;
 static HWND g_hWnd;
-
-// Diagnostics
-
-INT_PTR CALLBACK Capabilities(HWND, UINT, WPARAM, LPARAM);
-static char gldxcaps[1024]; // capability info
-static char capsText[1024]; // For dialog
-static bool bCopyClipboard = false;
 
 //--------------------------------------------------------------
 void ofApp::setup(){
@@ -122,13 +57,19 @@ void ofApp::setup(){
 	ofBackground(0, 0, 0);
 
 #ifdef BUILDRECEIVER
-	strcpy_s(senderName, 256, "ofSpoutReceiver");
-	ofSetWindowTitle("Spout Receiver");
+	strcpy_s(senderName, 256, "Spout Receiver");
+	// Graphics adapter index and name for about box
+	adapterIndex = receiver.GetAdapter();
+	receiver.GetAdapterName(adapterIndex, adapterName, 256);
 #else
-	strcpy_s(senderName, 256, "ofSpoutSender"); // The sender name
-	ofSetWindowTitle("Spout Sender");
+	strcpy_s(senderName, 256, "Spout Sender"); // The sender name
+	adapterIndex = sender.GetAdapter();
+	sender.GetAdapterName(adapterIndex, adapterName, 256);
 #endif
-	
+
+	// Show the application title
+	ofSetWindowTitle(senderName);
+
 	// OpenSpoutConsole(); // Empty console for debugging
 	// EnableSpoutLog(); // Log to console
 	EnableSpoutLogFile(senderName); // Log to file
@@ -140,25 +81,14 @@ void ofApp::setup(){
 	g_hWnd = ofGetWin32Window();
 
 	// Set a custom window icon
-	SetClassLongA(g_hWnd, GCLP_HICON, (LONG)LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
+	SetClassLongA(g_hWnd, GCLP_HICON, (LONGLONG)LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
 
 	// Load a font rather than the default
-	if (!myFont.load("fonts/DejaVuSans.ttf", 12, true, true))
-	  printf("Font not loaded\n");
+	if(!myFont.load("fonts/DejaVuSans.ttf", 12, true, true))
+	  printf("ofApp error - Font not loaded\n");
 
 	// Disable escape key exit
 	ofSetEscapeQuitsApp(false);
-
-	// For diagmostics
-	g_ThreadedOptimization = 0;
-	bLaptop = false; // NVAPI detection of a laptop
-	bIntegrated = false; // Laptop using integrated GPU
-	NvidiaMode = -1; // Optimus graphics mode
-	NvidiaDriverVersion = 0; // Driver Version
-	NvidiaBuildBranchString[128];
-	DriverPrimary = 0;
-	DriverSecondary = 0;
-	bCopyClipboard = false;
 
 	//
 	// Create a menu using ofxWinMenu
@@ -201,7 +131,6 @@ void ofApp::setup(){
 	// "Help" popup
 	//
 	hPopup = menu->AddPopupMenu(g_hMenu, "Help");
-	menu->AddPopupItem(hPopup, "Diagnostics", false, false); // No auto check
 	menu->AddPopupItem(hPopup, "About", false, false); // No auto check
 	
 	// Adjust window to desired client size allowing for the menu
@@ -239,15 +168,9 @@ void ofApp::setup(){
 	// Allocate an RGBA texture to receive from the sender
 	// It can be resized later to match the sender - see Update()
 	myTexture.allocate(senderWidth, senderHeight, GL_RGBA);
-	// Get the current user-set share mode from the registry
-	// (0 - texture : 1 - memory : 2 - auto)
-	shareMode = receiver.GetShareMode();
 #else
 	// Give the sender a name (if no name is specified, the executable name is used)
 	sender.SetSenderName(senderName);
-	// Get the current user-set share mode from the registry
-	// (0 - texture : 1 - memory : 2 - auto)
-	shareMode = sender.GetShareMode();
 #endif
 
 	// Skybox setup
@@ -310,55 +233,56 @@ void ofApp::draw() {
 
 #ifdef BUILDRECEIVER
 
-	char text[256];
 	std::string str;
 	ofSetColor(255);
 
 	// ReceiveTexture connects to and receives from a sender
-	if(receiver.ReceiveTexture(myTexture.getTextureData().textureID, myTexture.getTextureData().textureTarget))
+	if (receiver.ReceiveTexture(myTexture.getTextureData().textureID, myTexture.getTextureData().textureTarget)) {
 		myTexture.draw(0, 0, ofGetWidth(), ofGetHeight());
+	}
 
 	if (bShowInfo && !bFullScreen) {
 
 		if (receiver.IsConnected()) {
 
+			ofSetColor(255);
+
+			std::string str = "Recieving : ";
+			str += receiver.GetSenderName();
+			str += " (";
+			str += ofToString(receiver.GetSenderWidth()); str += "x";
+			str += ofToString(receiver.GetSenderHeight()); str += " ";
 			// GetSenderFrame() will return false for senders < 2.007
 			// Frame counting can also be disabled in SpoutSettings
 			if (receiver.GetSenderFrame() > 0) {
-				sprintf_s(text, 256, "Receiving : [%s] (%dx%d : fps %2.0f : frame %d)",
-					receiver.GetSenderName(), // sender name
-					receiver.GetSenderWidth(), // width
-					receiver.GetSenderHeight(), // height 
-					receiver.GetSenderFps(), // fps
-					receiver.GetSenderFrame()); // frame since the sender started
+				str += " fps ";
+				str += ofToString((int)roundf(receiver.GetSenderFps()));
+				str += " frame  ";
+				str += ofToString(receiver.GetSenderFrame());
 			}
 			else {
-				sprintf_s(text, 256, "Receiving : [%s] (%dx%d)",
-					receiver.GetSenderName(),
-					receiver.GetSenderWidth(),
-					receiver.GetSenderHeight());
+				// Show Openframeworks fps
+				str += " fps : " + ofToString((int)roundf(ofGetFrameRate()));
 			}
-			str = text;
-			myFont.drawString(str, 10, 30);
-	
-			myFont.drawString("RH click - select sender\n'f'  full screen : '  '  hide info", 10, ofGetHeight() - 30);
+			str += ")";
+			myFont.drawString(str, 20, 30);
 		}
 		else {
-			myFont.drawString("No sender detected", 10, 30);
+			myFont.drawString("No sender detected", 20, 30);
 		}
 
-		// Memoryshare
-		if (shareMode == 1) {
-			str = "Memory share";
+		// Is the receiver using CPU sharing ?
+		if (receiver.GetCPUshare()) {
+			str = "CPU share";
 		}
-		// Texture share (Auto share mode to be removed)
 		else {
-			if (receiver.GetMemoryShare())
-				str = "Memory share compatible";
-			else
-				str = "Texture share";
+			str = "Texture share";
+			// Graphics can still be incompatible if the user
+			// did not select "Auto" or "CPU" in SpoutSettings
+			if (!receiver.IsGLDXready())
+				str += " (Graphics not compatible)";
 		}
-		myFont.drawString(str, 10, 52);
+		myFont.drawString(str, 20, 52);
 
 	} // endif show info
 
@@ -413,7 +337,7 @@ void ofApp::draw() {
 		std::string str = "Sending as : ";
 		str += sender.GetName(); str += " (";
 		str += ofToString(sender.GetWidth()); str += "x";
-		str += ofToString(sender.GetHeight()); str += ")";
+		str += ofToString(sender.GetHeight());
 		// Show sender fps and framecount if selected
 		if (sender.GetFrame() > 0) {
 			str += " fps ";
@@ -425,20 +349,20 @@ void ofApp::draw() {
 			// Show Openframeworks fps
 			str += " fps : " + ofToString((int)roundf(ofGetFrameRate()));
 		}
+		str += ")";
 		myFont.drawString(str, 20, 30);
 
-		// Memoryshare
-		if (shareMode == 1) {
-				str = "Memory share";
+		// Is the sender using CPU sharing?
+		if (sender.GetCPUshare()) {
+			str = "CPU share";
 		}
-		// Texture share (Auto share mode to be removed)
 		else {
-			if (sender.GetMemoryShare())
-				str = "Memory share compatible";
-			else
-				str = "Texture share";
+			str = "Texture share";
+			// Graphics can still be incompatible if the user
+			// did not select "Auto" or "CPU" in SpoutSettings
+			if (!sender.IsGLDXready())
+				str += " (Graphics not compatible)";
 		}
-
 		myFont.drawString(str, 20, 52);
 
 	} // endif show info
@@ -494,6 +418,26 @@ void ofApp::keyPressed(int key) {
 		doFullScreen(bFullScreen);
 	}
 
+	// Snapshot - F12 key
+	if (key == OF_KEY_F12) {
+		if (receiver.IsConnected())
+		{
+			char imagename[MAX_PATH];
+			if (EnterSenderName(imagename, "Image name")) {
+				std::string name = imagename;
+				// Ad an extension if none entered
+				std::size_t found = name.find('.');
+				if (found == std::string::npos)
+					name += ".jpg";
+				ofImage myImage;
+				myTexture.readToPixels(myImage.getPixels());
+				// Save to bin>data
+				myImage.save(name);
+			}
+		}
+	}
+
+
 #endif
 
 	if (key == ' ') {
@@ -537,16 +481,17 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 
 #ifndef BUILDRECEIVER
 	if (title == "Sender name") {
-		char sendername[256];
+		char sendername[256]; // Name comparison
 		strcpy_s(sendername, senderName);
-		if (EnterSenderName(sendername)) {
+		if (EnterSenderName(sendername, "Sender name")) {
 			if (strcmp(sendername, senderName) != 0) {
-				// Release the current sender and start again
+				// Change to the user entered name
 				strcpy_s(senderName, 256, sendername);
+				// Release the current sender
+				// SendTexture looks after sender creation for the new name
 				sender.ReleaseSender();
-				sender.CreateSender(senderName, senderWidth, senderHeight);
-				// Get the name in case of multiple numbered names of the same sender
-				sender.spout.GetActiveSender(senderName);
+				// SetSenderName handles duplicate names with "_1", "_2" etc. appended.
+				sender.SetSenderName(senderName);
 			}
 		}
 	}
@@ -594,11 +539,6 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	//
 	// Help menu
 	//
-
-	if (title == "Diagnostics") {
-		DoDiagnostics();
-		DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_CAPSBOX), g_hWnd, Capabilities);
-	}
 
 	if (title == "About") {
 		DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_ABOUTBOX), g_hWnd, About);
@@ -703,11 +643,16 @@ void ofApp::doFullScreen(bool bFullscreen)
 }
 
 
-bool ofApp::EnterSenderName(char *SenderName)
+bool ofApp::EnterSenderName(char *SenderName, char *caption)
 {
 	int retvalue = 0;
 	unsigned char textin[256];
+	unsigned char captin[256];
 
+	// Caption 
+	strcpy_s(szCaption = (PSTR)captin, 256, caption); // move to a static string for the dialog
+
+	// Existing name
 	strcpy_s(szText = (PSTR)textin, 256, SenderName); // move to a static string for the dialog
 
 	// Show the dialog box 
@@ -732,6 +677,8 @@ INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 	switch (message) {
 
 	case WM_INITDIALOG:
+		// Set dialog caption
+		SetWindowTextA(hDlg, szCaption);
 		// Fill text entry box with passed string
 		SetDlgItemTextA(hDlg, IDC_NAMETEXT, szText);
 		// Select all text in the edit field
@@ -757,7 +704,6 @@ INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 
 	return (INT_PTR)FALSE;
 }
-
 
 
 // Message handler for About box
@@ -794,7 +740,6 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 			}
 		}
-		// strcat_s(about, 1024, "\r\n");
 
 		// Get the Spout version
 		spoutVersion = 0;
@@ -824,10 +769,14 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 		SetDlgItemTextA(hDlg, IDC_ABOUT_TEXT, (LPCSTR)about);
 
+		// Graphics adapter index and name
+		sprintf_s(tmp, MAX_PATH, "%s\r\n", adapterName);
+		SetDlgItemTextA(hDlg, IDC_ADAPTER_TEXT, (LPCSTR)tmp);
+
 		// Hyperlink hand cursor
 		cursorHand = LoadCursor(NULL, IDC_HAND);
 		hwnd = GetDlgItem(hDlg, IDC_SPOUT_URL);
-		SetClassLongA(hwnd, GCLP_HCURSOR, (long)cursorHand);
+		SetClassLongA(hwnd, GCLP_HCURSOR, (LONGLONG)cursorHand);
 		break;
 
 	case WM_DRAWITEM:
@@ -836,7 +785,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		lpdis = (LPDRAWITEMSTRUCT)lParam;
 		if (lpdis->itemID == -1) break;
 		SetTextColor(lpdis->hDC, RGB(6, 69, 173));
-		DrawTextA(lpdis->hDC, "http://spout.zeal.co", -1, &lpdis->rcItem, DT_LEFT);
+		DrawTextA(lpdis->hDC, "https://spout.zeal.co", -1, &lpdis->rcItem, DT_LEFT);
 		break;
 
 	case WM_COMMAND:
@@ -856,461 +805,4 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 	return (INT_PTR)FALSE;
-}
-
-// 
-// Diagnostics
-//
-
-// Message handler for caps dialog
-INT_PTR CALLBACK Capabilities(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	// Copied from SpoutSettings
-	UNREFERENCED_PARAMETER(lParam);
-	HCURSOR cursorHand = NULL;
-	LPDRAWITEMSTRUCT lpdis;
-	char tmp[MAX_PATH];
-
-	switch (message) {
-
-	case WM_INITDIALOG:
-
-		// Diagnostics text
-		SetDlgItemTextA(hDlg, IDC_CAPSTEXT, (LPCSTR)gldxcaps);
-
-		// Hyperlink hand cursor
-		cursorHand = LoadCursor(NULL, IDC_HAND);
-		SetClassLongPtrA(GetDlgItem(hDlg, IDC_SPOUT_URL), GCLP_HCURSOR, (LONG_PTR)cursorHand);
-
-		return (INT_PTR)TRUE;
-
-	case WM_DRAWITEM:
-
-		// The blue hyperlinks
-		lpdis = (LPDRAWITEMSTRUCT)lParam;
-		if (lpdis->itemID == -1) break;
-		SetTextColor(lpdis->hDC, RGB(6, 69, 173));
-		switch (lpdis->CtlID) {
-		case IDC_SPOUT_URL:
-			DrawTextA(lpdis->hDC, "https://spout.zeal.co", -1, &lpdis->rcItem, DT_LEFT);
-			break;
-		default:
-			break;
-		}
-		break;
-
-	case WM_COMMAND:
-
-		switch (LOWORD(wParam)) {
-
-		case IDC_SPOUT_URL:
-			sprintf_s(tmp, MAX_PATH, "http://spout.zeal.co");
-			ShellExecuteA(hDlg, "open", tmp, NULL, NULL, SW_SHOWNORMAL);
-			EndDialog(hDlg, 0);
-			return (INT_PTR)TRUE;
-
-		case IDOK:
-		case IDCANCEL:
-			EndDialog(hDlg, LOWORD(wParam));
-			return (INT_PTR)TRUE;
-
-		case IDC_LOG:
-			ShowSpoutLogs();
-			EndDialog(hDlg, LOWORD(wParam));
-			return (INT_PTR)TRUE;
-
-		case IDC_COPY:
-		{
-			// Crash on repeat for some reason
-			if (!bCopyClipboard && gldxcaps[0] && strlen(gldxcaps) > 16) {
-				if (OpenClipboard(g_hWnd)) {
-					HGLOBAL clipbuffer = NULL;
-					char* buffer = nullptr;
-					EmptyClipboard();
-					clipbuffer = GlobalAlloc(GMEM_DDESHARE, strlen(gldxcaps) + 1);
-					if (clipbuffer) {
-						buffer = (char*)GlobalLock(clipbuffer);
-						strcpy_s(buffer, strlen(gldxcaps) + 1, LPCSTR(gldxcaps));
-						GlobalUnlock(clipbuffer);
-						SetClipboardData(CF_TEXT, clipbuffer); // ??? crash here on repeat
-						MessageBoxA(hDlg, "Diagnostics copied to the clipboard.", "Spout Demo", MB_OK);
-						GlobalFree(clipbuffer);
-						bCopyClipboard = true;
-					}
-					CloseClipboard();
-				}
-				else {
-					MessageBoxA(hDlg, "Unknown clipboard open error.", "Spout Demo", MB_OK);
-				}
-			}
-			else {
-				MessageBoxA(hDlg, "Diagnostics copied to the clipboard.", "Spout Demo", MB_OK);
-			}
-			return (INT_PTR)TRUE;
-		}
-
-		default:
-			return (INT_PTR)FALSE;
-
-		} // end switch (LOWORD(wParam))
-	}
-
-	return (INT_PTR)FALSE;
-}
-
-bool ofApp::DoDiagnostics()
-{
-
-	SpoutLogNotice("\nSpout Demo Program : DoDiagnostics\n");
-
-	// Copied from SpoutSettings
-	bool bMemory = false;
-	bool bDX9 = false;
-	bool bDX9available = false;
-	bool bDX11available = false;
-
-	Spout *spout = new Spout; // local (no diagnostics are initially performed)
-
-	gldxcaps[0] = 0; // for repeats
-	sprintf_s(gldxcaps, 1024, "Spout Demo Program\r\n");
-
-	//
-	// Check DirectX
-	//
-
-	// Check for DirectX 9.0c
-	if (CheckForDirectX9c()) {
-		strcat_s(gldxcaps, 1024, "DirectX 9c installed\r\n");
-		// DirectX 9 installed - try to open a DX9 device
-		bDX9available = spout->interop.OpenDirectX9(g_hWnd);
-		if (!bDX9available) {
-			strcat_s(gldxcaps, 1024, "Warning : DirectX 9 device not available\r\n");
-			bDX9 = false;
-		}
-		else {
-			spout->interop.CleanupDX9();
-			strcat_s(gldxcaps, 1024, "DirectX 9 device available\r\n");
-		}
-		// Try to open a DX11 device
-		bDX11available = spout->interop.OpenDirectX11();
-		if (!bDX11available) {
-			strcat_s(gldxcaps, 1024, "Warning : DirectX 11 device not available\r\n");
-		}
-		else {
-			spout->interop.CleanupDX11();
-			strcat_s(gldxcaps, 1024, "DirectX 11 device available\r\n");
-		}
-	}
-	else {
-		strcat_s(gldxcaps, 1024, "DirectX 9.0c not installed\r\n");
-		strcat_s(gldxcaps, 1024, "DirectX 9 device not available\r\n");
-		bDX9 = false;
-		bDX11available = spout->interop.OpenDirectX11();
-		if (!bDX11available) {
-			strcat_s(gldxcaps, 1024, "DirectX 11 device not available\r\n");
-		}
-		else {
-			spout->interop.CleanupDX11();
-			strcat_s(gldxcaps, 1024, "DirectX 11 device available\r\n");
-		}
-	}
-
-	// Check the vendor of the primary GPU currently in use
-	strcat_s(gldxcaps, 1024, "Primary adapter : ");
-	strcat_s(gldxcaps, 1024, (char *)glGetString(GL_VENDOR));
-	strcat_s(gldxcaps, 1024, "\r\n");
-
-	// Find the primary adapter details using DirectX and Windows functions
-	char adapter[256]; adapter[0] = 0;;
-	char display[256]; display[0] = 0;
-	spout->interop.spoutdx.GetAdapterInfo(adapter, display, 256);
-
-	//
-	// Add the driver desc to the caps text
-	//
-
-	// The display adapter
-	if (display) trim(display);
-	if (display[0]) {
-		strcat_s(gldxcaps, 1024, display);
-		strcat_s(gldxcaps, 1024, " (Display) : ");
-		strcat_s(gldxcaps, 1024, "\r\n");
-	}
-
-	// Secondary adapter
-	if (adapter) trim(adapter);
-	if (adapter[0]) {
-		trim(adapter);
-		if (strcmp(adapter, display) != 0) {
-			strcat_s(gldxcaps, 1024, adapter);
-			strcat_s(gldxcaps, 1024, " (Secondary)");
-			strcat_s(gldxcaps, 1024, "\r\n");
-		}
-	}
-
-	// Check for Laptop using NVAPI
-	bIntegrated = false;
-	if (g_NvApi.IsLaptop(&bIntegrated)) {
-		strcat_s(gldxcaps, 1024, "Laptop system detected\r\n");
-		if (bIntegrated) {
-			// Get the current Optimus NVIDIA setting from the NVIDIA base profile
-			// This will just fail for unsupported hardware and return -1
-			// 0 - nvidia : 1 - integrated : 2 - auto-select, -1 fail
-			NvidiaMode = g_NvApi.GetNvidiaGPU(&NvidiaDriverVersion, NvidiaBuildBranchString);
-			if (NvidiaMode >= 0) {
-				if (NvidiaMode == 0)
-					strcat_s(gldxcaps, 1024, "Optimus using NVIDIA processor\r\n");
-				if (NvidiaMode == 1)
-					strcat_s(gldxcaps, 1024, "Optimus using Integrated processor\r\n");
-				if (NvidiaMode == 2)
-					strcat_s(gldxcaps, 1024, "Optimus Auto-select processor\r\n");
-			}
-		}
-	}
-	else {
-		strcat_s(gldxcaps, 1024, "Desktop system detected\r\n");
-	}
-
-	// Check for user set memoryshare mode first (> vers 2.005)
-	// Will always return false for 2.004 apps.
-	bMemory = spout->GetMemoryShareMode();
-
-	// Compatibilty check
-	// DirectX is OK but check for availabilty of the GL/DX extensions.
-	// The NV_DX_interop extensions will fail if the graphics driver does not support them
-	if (bDX11available || bDX9available) {
-		if (wglGetProcAddress("wglDXOpenDeviceNV")) { // extensions can be loaded
-			strcat_s(gldxcaps, 1024, "NV_DX_interop extensions available\r\n");
-			// Now actually load the extensions
-			if (!spout->interop.LoadGLextensions()) {
-				strcat_s(gldxcaps, 1024, "OpenGL extensions failed to load\r\n");
-				strcat_s(gldxcaps, 1024, "Graphics not texture share compatible\r\n");
-			}
-			else {
-				// It is possible that extensions load OK but that the GL/DX interop functions fail.
-				// This has been noted on dual graphics machines with the NVIDIA Optimus driver.
-				// If the compatibility test fails, fall back to memoryshare
-				// Check OpenGL GL/DX extension functions
-				// and create an interop device for success
-				if (bDX11available) {
-					// Create a DX11 device again
-					if (spout->interop.OpenDirectX11()) {
-						if (!spout->interop.GLDXready()) {
-							strcat_s(gldxcaps, 1024, "Warning : OpenGL/DX11 texture sharing failed\r\n");
-						}
-						else {
-							strcat_s(gldxcaps, 1024, "OpenGL/DX11 texture sharing succeeded\r\n");
-						}
-						spout->interop.CleanupDX11();
-					}
-					else {
-						strcat_s(gldxcaps, 1024, "DX11 initialization failed\r\n");
-					}
-				}
-				else if (bDX9available) {
-					// Create a DX9 device again
-					if (spout->interop.OpenDirectX9(g_hWnd)) {
-						if (!GLDXready(true)) {
-							strcat_s(gldxcaps, 1024, "Warning : OpenGL/DX9 texture sharing failed\r\n");
-						}
-						else {
-							strcat_s(gldxcaps, 1024, "OpenGL/DX9 texture sharing suceeded\r\n");
-						}
-						spout->interop.CleanupDX9();
-					}
-				}
-
-				bDX9 = spout->GetDX9(); // DX9 or DX11
-				bMemory = spout->interop.GetMemoryShare(); // Auto share mode
-				strcat_s(gldxcaps, 1024, "Compatibility");
-				if (bMemory)
-					strcat_s(gldxcaps, 1024, " - Memory share\r\n");
-				else {
-					if (bDX9)
-						strcat_s(gldxcaps, 1024, " - Texture (DirectX 9)\r\n");
-					else
-						strcat_s(gldxcaps, 1024, " - Texture (DirectX 11)\r\n");
-				}
-
-			} // loaded extensions OK
-		}
-		else {
-			// The extensions required for texture access are not available.
-			strcat_s(gldxcaps, 1024, "NV_DX_interop extensions not supported\r\n");
-			strcat_s(gldxcaps, 1024, "Graphics not texture share compatible\r\n");
-		}
-	}
-
-	delete spout;
-
-	return true;
-}
-
-
-//
-// Test whether the NVIDIA OpenGL/DirectX interop extensions function correctly. 
-// Creates dummy textures and uses the interop functions.
-// Creates an interop device on success.
-// Must be called after OpenDirectX.
-// Failure means fall back to Memoryshare mode
-// Success means the GLDX interop functions can be used.
-// Other errors should not happen if OpenDirectX succeeded
-bool ofApp::GLDXready(bool bDX9)
-{
-	HANDLE dxShareHandle = NULL; // Shared texture handle
-	LPDIRECT3DTEXTURE9  dxTexture = nullptr; // shared DX9 texture
-	ID3D11Texture2D* pSharedTexture = nullptr; // shared DX11 texture
-	HANDLE hInteropObject = NULL; // handle to the DX/GL interop object
-	GLuint glTexture = 0; // OpenGL texture linked to the shared DX texture
-
-	Spout spout;
-
-	// Create an opengl texture for the test
-	glGenTextures(1, &glTexture);
-	if (glTexture == 0) {
-		MessageBoxA(NULL, "GLDXReady - glGenTextures failed", "Spout demo", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-		return false;
-	}
-
-	SpoutLogNotice("SpoutDemo::GLDXready - testing GL/DX interop functions");
-
-	//
-	// Create a directX texture and link using the NVIDIA GLDX interop functions
-	//
-	if (bDX9) {
-
-		if (spout.interop.m_pDevice == NULL) {
-			glDeleteTextures(1, &glTexture);
-			MessageBoxA(NULL, "GLDXready (DX9) - No D3D9ex device", "SpoutSettings", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-			SpoutLogError("SpoutDemo::GLDXready (DX9) - No D3D9ex device");
-			return false;
-		}
-
-		SpoutLogNotice("    Creating test DX9 texture");
-
-		// Create a shared DirectX9 texture for the test
-		dxShareHandle = NULL;
-		if (!spout.interop.spoutdx.CreateSharedDX9Texture(spout.interop.m_pDevice,
-			256, 256,
-			D3DFMT_A8R8G8B8, // default
-			dxTexture, dxShareHandle)) {
-			glDeleteTextures(1, &glTexture);
-			MessageBoxA(NULL, "GLDXready (DX9) - CreateSharedDX9Texture failed", "SpoutSettings", MB_OK | MB_TOPMOST | MB_ICONEXCLAMATION);
-			SpoutLogError("SpoutDemo::GLDXready (DX9) - CreateSharedDX9Texture failed");
-			return false;
-		}
-
-		SpoutLogNotice("    Linking test DX9 texture (0x%Ix)", dxTexture);
-
-		// Link the shared DirectX9 texture to the OpenGL texture
-		// If sucessful, LinkGLDXtextures initializes a class handle
-		// to a GL/DirectX interop device - m_hInteropDevice
-		hInteropObject = spout.interop.LinkGLDXtextures(spout.interop.m_pDevice, dxTexture, dxShareHandle, glTexture);
-		if (hInteropObject == NULL) {
-			SpoutLogError("SpoutDemo::GLDXready (DX9) - LinkGLDXtextures failed");
-			dxTexture->Release();
-			glDeleteTextures(1, &glTexture);
-			return false;
-		}
-		SpoutLogNotice("    Test DX9 texture created and linked OK");
-
-		if (spout.interop.m_hInteropDevice && hInteropObject) {
-			wglDXUnregisterObjectNV(spout.interop.m_hInteropDevice, hInteropObject);
-			if (!wglDXCloseDeviceNV(spout.interop.m_hInteropDevice)) {
-				SpoutLogWarning("SpoutDemo::GLDXReady - DX9 could not close interop");
-			}
-			spout.interop.m_hInteropDevice = NULL;
-		}
-		if (dxTexture)
-			dxTexture->Release();
-		if (glTexture)
-			glDeleteTextures(1, &glTexture);
-
-	} // endif DX9
-	else {
-		SpoutLogNotice("    Creating test DX11 texture");
-		// Create a new shared DirectX resource
-		dxShareHandle = NULL;
-		if (!spout.interop.spoutdx.CreateSharedDX11Texture(spout.interop.m_pd3dDevice,
-			256, 256,
-			DXGI_FORMAT_B8G8R8A8_UNORM, // default
-			&pSharedTexture,
-			dxShareHandle)) {
-			glDeleteTextures(1, &glTexture);
-			SpoutLogError("SpoutDemo::GLDXready (DX11) - CreateSharedDX11Texture failed");
-			return false;
-		}
-
-		SpoutLogNotice("    Linking test DX11 texture (0x%Ix) OpenGL texture (%2d)", pSharedTexture, glTexture);
-
-		// Link the shared DirectX texture to the OpenGL texture
-		// If sucessful, LinkGLDXtextures initializes a class handle
-		// to a GL/DirectX interop device - m_hInteropDevice
-		hInteropObject = spout.interop.LinkGLDXtextures(spout.interop.m_pd3dDevice,
-			pSharedTexture,
-			dxShareHandle,
-			glTexture);
-		if (!hInteropObject) {
-			spout.interop.spoutdx.ReleaseDX11Texture(spout.interop.m_pd3dDevice, pSharedTexture);
-			SpoutLogError("SpoutDemo::GLDXready (DX11) - LinkGLDXtextures failed");
-			return false;
-		}
-
-		SpoutLogNotice("    Test DX11 texture created and linked OK");
-
-		// All passes, so unregister and release textures
-		// m_hInteropDevice remains and does not need to be created again
-		if (spout.interop.m_hInteropDevice && hInteropObject) {
-			wglDXUnregisterObjectNV(spout.interop.m_hInteropDevice, hInteropObject);
-			if (!wglDXCloseDeviceNV(spout.interop.m_hInteropDevice)) {
-				SpoutLogWarning("SpoutDemo::GLDXReady DX11 - could not close interop");
-			}
-			spout.interop.m_hInteropDevice = NULL;
-		}
-
-		spout.interop.spoutdx.ReleaseDX11Texture(spout.interop.m_pd3dDevice, pSharedTexture);
-
-		if (glTexture)
-			glDeleteTextures(1, &glTexture);
-
-	}
-
-	return true;
-
-}
-
-bool ofApp::CheckForDirectX9c()
-{
-	// HKLM\Software\Microsoft\DirectX\Version should be 4.09.00.0904
-	// handy information : http://en.wikipedia.org/wiki/DirectX
-	HKEY  hRegKey;
-	LONG  regres;
-	DWORD  dwSize, major, minor, revision, notused;
-	char value[256];
-	dwSize = 256;
-
-	// Does the key exist
-	regres = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\DirectX", NULL, KEY_READ, &hRegKey);
-	if (regres == ERROR_SUCCESS) {
-		// Read the key
-		regres = RegQueryValueExA(hRegKey, "Version", 0, NULL, (LPBYTE)value, &dwSize);
-		// Decode the string : 4.09.00.0904
-		sscanf_s(value, "%d.%d.%d.%d", &major, &minor, &notused, &revision);
-		RegCloseKey(hRegKey);
-		if (major == 4 && minor == 9 && revision == 904)
-			return true;
-	}
-	return false;
-
-}
-
-
-void ofApp::trim(char* s) {
-	char* p = s;
-	int l = (int)strlen(p);
-
-	while (isspace(p[l - 1])) p[--l] = 0;
-	while (*p && isspace(*p)) ++p, --l;
-
-	memmove(s, p, l + 1);
 }

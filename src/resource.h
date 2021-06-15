@@ -9,13 +9,9 @@
 #define IDI_ICON1           100
 
 #define IDC_ABOUT_TEXT      400
-#define IDC_SPOUT_URL       401
-#define IDC_NAMETEXT        402
-#define IDC_CAPSTEXT        403
-#define IDC_COPY            404
-#define IDC_LOG             405
-
+#define IDC_ADAPTER_TEXT    401
+#define IDC_SPOUT_URL       402
+#define IDC_NAMETEXT        403
 #define IDD_ABOUTBOX        500
-#define IDD_CAPSBOX         501
-#define IDD_NAMEBOX         502
+#define IDD_NAMEBOX         501
 
