@@ -1,7 +1,7 @@
 # ofSpoutDemo
-Spout OpenFrameworks Demo program
+Spout Openframeworks Demo program
 
-Please note that this program is designed to test Spout development code and is not the same as the demo programs provided with the Spout distribution. Nevertheless it could also be useful for other purposes.
+Please note that this program is not the same as the demo programs provided with the Spout distribution. Nevertheless it could also be useful for other purposes. The receiver includes an image snapshot with the F12 key. Images are saved in bin>data. Default extension is ".jpg". You can specify any image type supported by Openframeworks.
 
 The project requires the files from the Spout SDK "develop" branch as detailed below.
 
@@ -19,8 +19,8 @@ The source for both of these is modified and included with the project.
        e.g. "of_v0.11.0_vs2017_release"
   3) Copy the folder to a convenient location and rename it as you wish\
        e.g. somefolder\OPENFRAMEWORKS11
-  4) Download the ["develop"](https://github.com/leadedge/Spout2/tree/develop) branch of the Spout SDK
-  5) Copy the entire "SpoutSDK" folder into the Openframeworks "apps" folder
+  4) Download the ["beta"](https://github.com/leadedge/Spout2/tree/beta) branch of the Spout SDK
+  5) Copy the "SpoutGL" folder into the Openframeworks "apps" folder
   6) Download this repository
   7) Copy the "ofSpoutDemo" folder and contents to the Openframeworks "apps\myApps" folder.
   
