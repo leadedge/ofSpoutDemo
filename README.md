@@ -30,7 +30,7 @@ OPENFRAMEWORKS11\
 &nbsp;&nbsp;&nbsp;&nbsp;addons\
 &nbsp;&nbsp;&nbsp;&nbsp;examples\
 &nbsp;&nbsp;&nbsp;&nbsp;apps\
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SpoutSDK <- the Spout SDK source files\
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SpoutGL <- the Spout SDK source files\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;myApps\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;emptyExample <- Openframeworks example template\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ofSpoutDemo <- the ofSpoutDemo project folder\
@@ -66,6 +66,8 @@ Find in ofApp.h :\
 ### Modifications
 
 The code may contain experimental functions which are not documented\
-As many comments as possible are included in the source files.
+As many comments as possible are included in the source files.\
+15.06.21 - added snapshot to receiver
+
 
 
