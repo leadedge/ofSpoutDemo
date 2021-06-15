@@ -3,7 +3,7 @@ Spout Openframeworks Demo program
 
 Please note that this program is not the same as the demo programs provided with the Spout distribution. Nevertheless it could also be useful for other purposes. The receiver includes an image snapshot with the F12 key. Images are saved in bin>data. Default extension is ".jpg". You can specify any image type supported by Openframeworks.
 
-The project requires the files from the Spout SDK "develop" branch as detailed below.
+The project requires the files from the Spout SDK "beta" branch as detailed below.
 
 Uses the [ofxSkybox](https://github.com/kalwalt/ofxSkyBox) addon\
 Created by kalwalt alias Walter Perdan
