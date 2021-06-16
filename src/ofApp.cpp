@@ -20,6 +20,10 @@
     https://github.com/leadedge/ofxWinMenu
 
 	15.06.21 - Add image snapshot with F12 key for receiver
+	16.06.21 - Add "Save image" and ""Open data folder" to receiver file menu
+			   Auto create image name for F12
+			   Create GitHub release
+			   Version 1.007
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -107,7 +111,10 @@ void ofApp::setup(){
 	// "File" popup menu
 	//
 	HMENU hPopup = menu->AddPopupMenu(g_hMenu, "File");
-#ifndef BUILDRECEIVER
+#ifdef BUILDRECEIVER
+	menu->AddPopupItem(hPopup, "Save image", false, false);
+	menu->AddPopupItem(hPopup, "Open data folder", false, false);
+#else
 	menu->AddPopupItem(hPopup, "Sender name", false, false);
 #endif
 	// Final File popup menu item is "Exit" - add a separator before it
@@ -422,18 +429,34 @@ void ofApp::keyPressed(int key) {
 	if (key == OF_KEY_F12) {
 		if (receiver.IsConnected())
 		{
-			char imagename[MAX_PATH];
-			if (EnterSenderName(imagename, "Image name")) {
-				std::string name = imagename;
-				// Ad an extension if none entered
-				std::size_t found = name.find('.');
-				if (found == std::string::npos)
-					name += ".jpg";
-				ofImage myImage;
-				myTexture.readToPixels(myImage.getPixels());
-				// Save to bin>data
-				myImage.save(name);
-			}
+			// Make an output image file name
+			std::string imagename = receiver.GetSenderName();
+			imagename += "_";
+			// make a name with date and time
+			std::stringstream filename;
+			time_t a = time(nullptr);
+			struct tm time_info;
+			// localtime_s, Microsoft version
+			localtime_s(&time_info, &a);
+			filename << std::put_time(&time_info, "%Y%m%d_%H%M%S");
+			imagename += filename.str();
+			imagename += ".jpg"; // default
+			ofImage myImage;
+			myTexture.readToPixels(myImage.getPixels());
+			// Save to bin>data
+			myImage.save(imagename);
+			/*
+			std::string datapath = ofFilePath::getCurrentExeDir();
+			datapath += "\\data";
+			char tmp[256];
+			sprintf_s(tmp, "Saved image\n%s\nto\n%s", imagename.c_str(), datapath.c_str());
+			*/
+			char tmp[256];
+			sprintf_s(tmp, "Saved : %s", imagename.c_str());
+			SpoutMessageBox(NULL, tmp, "Message", MB_OK, 1400);
+		}
+		else {
+			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1400);
 		}
 	}
 
@@ -479,7 +502,34 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	// File menu
 	//
 
-#ifndef BUILDRECEIVER
+#ifdef BUILDRECEIVER
+	if (title == "Save image") {
+		if (receiver.IsConnected())
+		{
+			char imagename[MAX_PATH];
+			imagename[0] = 0; // No existing name
+			if (EnterSenderName(imagename, "Image name")) {
+				std::string name = imagename;
+				// Ad an extension if none entered
+				std::size_t found = name.find('.');
+				if (found == std::string::npos)
+					name += ".jpg";
+				ofImage myImage;
+				myTexture.readToPixels(myImage.getPixels());
+				// Save to bin>data
+				myImage.save(name);
+			}
+		}
+		else {
+			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1400);
+		}
+	}
+	if (title == "Open data folder") {
+		std::string datapath = ofFilePath::getCurrentExeDir();
+		datapath += "\\data";
+		ShellExecuteA(ofGetWin32Window(), "open", datapath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+	}
+#else
 	if (title == "Sender name") {
 		char sendername[256]; // Name comparison
 		strcpy_s(sendername, senderName);
@@ -724,7 +774,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	case WM_INITDIALOG:
 
-		sprintf_s(about, 256, "Spout demo program\r\n       Version ");
+		sprintf_s(about, 256, "Spout demo program\r\n    Version ");
 		// Get product version number
 		if (GetModuleFileNameA(hInstance, tmp, MAX_PATH)) {
 			dwSize = GetFileVersionInfoSizeA(tmp, &dummy);
