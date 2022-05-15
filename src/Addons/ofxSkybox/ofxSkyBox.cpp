@@ -6,6 +6,12 @@
 //
 
 
+// LJ DEBUG
+// C++ code analysis warning 26812 for VS2022
+// Class enums have cascading effects.
+// Many other libraries do not use them at this time.
+#pragma warning(disable : 26812)
+
 #include "ofxSkyBox.h"
 
 ofxSkyBox::ofxSkyBox(){

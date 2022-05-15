@@ -3,13 +3,13 @@
     Spout OpenFrameworks Demo program
 
     Spout 2.007
-    OpenFrameworks 11
-    Visual Studio 2017
+    OpenFrameworks 11.1
+    Visual Studio 2022
 
-    Copyright (C) 2020-2021 Lynn Jarvis.
+    Copyright (C) 2020-2022 Lynn Jarvis.
 
     This program can be used to test Spout development code.
-    Not for public use. See GitHub user project (https://github.com/leadedge/ofSpoutDemo)
+    See also GitHub user project (https://github.com/leadedge/ofSpoutDemo)
 
     Uses the ofxSkybox addon
     https://github.com/kalwalt/ofxSkyBox
@@ -24,6 +24,15 @@
 			   Auto create image name for F12
 			   Create GitHub release
 			   Version 1.007
+	16.06.21 - Use Openframeworks timestamp format for F12 image name
+	29.03.22 - Update to Openframeworks 11.1 and VS2022
+			   Remove "Portable/Installation" check from About function
+			   (2.006 installation no longer supported).
+			   Remove unused "char fname[MAX_PATH]" from About functon.
+			   resource.rc - Remove X offset for version number from About.
+	28.04.22 - Add MessageBox warning if SpoutPanel is not found (Spout.cpp).
+			   Rebuild x64 /MD. Provide required dlls in executable folder.
+	           Version 1.008
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -41,6 +50,7 @@
     =========================================================================
 
 */
+
 #include "ofApp.h"
 #include "resource.h"
 
@@ -73,10 +83,10 @@ void ofApp::setup(){
 
 	// Show the application title
 	ofSetWindowTitle(senderName);
-
 	// OpenSpoutConsole(); // Empty console for debugging
-	// EnableSpoutLog(); // Log to console
-	EnableSpoutLogFile(senderName); // Log to file
+	EnableSpoutLog(); // Log to console
+	// SetSpoutLogLevel(SpoutLogLevel::SPOUT_LOG_WARNING); // Log warnings only
+	// EnableSpoutLogFile(senderName); // Log to file
 
 	// Instance
 	g_hInstance = GetModuleHandle(NULL);
@@ -128,8 +138,10 @@ void ofApp::setup(){
 	bTopmost = false;
 	menu->AddPopupItem(hPopup, "Show on top"); // Unchecked, auto check
 #ifdef BUILDRECEIVER
+	bPreview = false;
+	menu->AddPopupItem(hPopup, "Preview", false, false); // Unchecked, no auto-check
 	bFullScreen = false;
-	menu->AddPopupItem(hPopup, "Full screen", false, false); // Not checked and no auto-check
+	menu->AddPopupItem(hPopup, "Full screen", false, false); // Unchecked, no auto-check
 #endif
 	bShowInfo = true;
 	menu->AddPopupItem(hPopup, "Show info", true); // Checked, auto-check
@@ -226,7 +238,6 @@ void ofApp::update() {
 		controlArea.scaleFromCenter(scale, scale);
 		easycam.setControlArea(controlArea);
 	}
-		
 
 #endif
 
@@ -248,15 +259,15 @@ void ofApp::draw() {
 		myTexture.draw(0, 0, ofGetWidth(), ofGetHeight());
 	}
 
-	if (bShowInfo && !bFullScreen) {
+	if (bShowInfo && !bFullScreen && !bPreview) {
 
 		if (receiver.IsConnected()) {
 
 			ofSetColor(255);
 
-			std::string str = "Recieving : ";
+			std::string str = "[";
 			str += receiver.GetSenderName();
-			str += " (";
+			str += "]  ";
 			str += ofToString(receiver.GetSenderWidth()); str += "x";
 			str += ofToString(receiver.GetSenderHeight()); str += " ";
 			// GetSenderFrame() will return false for senders < 2.007
@@ -271,7 +282,6 @@ void ofApp::draw() {
 				// Show Openframeworks fps
 				str += " fps : " + ofToString((int)roundf(ofGetFrameRate()));
 			}
-			str += ")";
 			myFont.drawString(str, 20, 30);
 		}
 		else {
@@ -290,6 +300,10 @@ void ofApp::draw() {
 				str += " (Graphics not compatible)";
 		}
 		myFont.drawString(str, 20, 52);
+
+		// Show the keyboard shortcuts
+		str = "RH click sender : f - fullscreen : p - preview : Space - hide info";
+		myFont.drawString(str, 20, ofGetHeight() - 20);
 
 	} // endif show info
 
@@ -337,7 +351,7 @@ void ofApp::draw() {
 		myFbo.getTexture().getTextureData().textureTarget,
 		senderWidth, senderHeight, false);
 
-	// Show what it is sending
+	// Show what it's sending
 	if (bShowInfo) {
 
 		ofSetColor(255);
@@ -413,53 +427,57 @@ void ofApp::mousePressed(int x, int y, int button) {
 void ofApp::keyPressed(int key) {
 
 #ifdef BUILDRECEIVER
+
+	// ESC key (exit on ESC disabled)
 	if (key == OF_KEY_ESC) {
-		if (bFullScreen) {
+		// Exit preview
+		if (bPreview) {
+			bPreview = false;
+			doFullScreen(bPreview, true); // Disable preview
+		}
+		// Exit full screen
+		else if (bFullScreen) {
 			bFullScreen = false;
-			doFullScreen(bFullScreen);
+			doFullScreen(bFullScreen, false); // Disable full screen
 		}
 	}
 
-	if(key == 'f') {
+	// Preview
+	if (key == 'p' && !bFullScreen) {
+		bPreview = !bPreview;
+		doFullScreen(bPreview, true);
+	}
+
+	// Full screen
+	if(key == 'f' && !bPreview) {
 		bFullScreen = !bFullScreen;
-		doFullScreen(bFullScreen);
+		doFullScreen(bFullScreen, false);
 	}
 
 	// Snapshot - F12 key
 	if (key == OF_KEY_F12) {
 		if (receiver.IsConnected())
 		{
-			// Make an output image file name
+			// Make a timestamped image file name
 			std::string imagename = receiver.GetSenderName();
-			imagename += "_";
-			// make a name with date and time
-			std::stringstream filename;
-			time_t a = time(nullptr);
-			struct tm time_info;
-			// localtime_s, Microsoft version
-			localtime_s(&time_info, &a);
-			filename << std::put_time(&time_info, "%Y%m%d_%H%M%S");
-			imagename += filename.str();
-			imagename += ".jpg"; // default
+			imagename += "_" + ofGetTimestampString() + ".jpg"; // jpg default
+			// Get pixels from received texture
 			ofImage myImage;
 			myTexture.readToPixels(myImage.getPixels());
-			// Save to bin>data
-			myImage.save(imagename);
-			/*
-			std::string datapath = ofFilePath::getCurrentExeDir();
-			datapath += "\\data";
+			// Save image to bin>data>captures
+			std::string savepath = "captures\\";
+			savepath += imagename;
+			myImage.save(savepath);
 			char tmp[256];
-			sprintf_s(tmp, "Saved image\n%s\nto\n%s", imagename.c_str(), datapath.c_str());
-			*/
-			char tmp[256];
-			sprintf_s(tmp, "Saved : %s", imagename.c_str());
-			SpoutMessageBox(NULL, tmp, "Message", MB_OK, 1400);
+			sprintf_s(tmp, "Saved : %s", savepath.c_str());
+			// Use SpoutUtils (SpoutPanel) timeout messagebox with 4 second delay
+			SpoutMessageBox(NULL, savepath.c_str(), "Message", MB_OK, 4000);
+
 		}
 		else {
 			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1400);
 		}
 	}
-
 
 #endif
 
@@ -555,9 +573,14 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	// Window menu
 	//
 
+	if (title == "Preview") {
+		bPreview = !bPreview;
+		doFullScreen(bPreview, true);
+	}
+
 	if (title == "Full screen") {
 		bFullScreen = !bFullScreen;
-		doFullScreen(bFullScreen);
+		doFullScreen(bFullScreen, false);
 	}
 
 	if (title == "Show on top") {
@@ -568,16 +591,22 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 			SetWindowPos(g_hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 			// CheckMenuItem(hmenu, IDM_TOPMOST, MF_BYCOMMAND | MF_CHECKED);
 			ShowWindow(g_hWnd, SW_SHOW);
+			g_hwndTopmost = g_hWnd;
 		}
 		else {
 			SetWindowPos(g_hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 			// CheckMenuItem(hmenu, IDM_TOPMOST, MF_BYCOMMAND | MF_UNCHECKED);
 			ShowWindow(g_hWnd, SW_SHOW);
 			// Reset the window that was top before
-			if (GetWindowLong(g_hwndForeground, GWL_EXSTYLE) & WS_EX_TOPMOST)
+			if (GetWindowLong(g_hwndForeground, GWL_EXSTYLE) & WS_EX_TOPMOST) {
 				SetWindowPos(g_hwndForeground, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-			else
+				g_hwndTopmost = g_hwndForeground;
+			}
+			else {
 				SetWindowPos(g_hwndForeground, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+			}
+			g_hwndTopmost = NULL;
+			// hwndTopmost is also found with full screen / preview
 		}
 	}
 
@@ -597,25 +626,53 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 } // end appMenuFunction
 
 
-void ofApp::doFullScreen(bool bFullscreen)
+void ofApp::doFullScreen(bool bEnable, bool bPreviewMode)
 {
 	RECT rectTaskBar;
 	HWND hWndTaskBar = NULL;
-	char tmp[256];
+	char tmp[256]; tmp[0] = 0;
+	HWND hwndTopmost = NULL;
 
-	if (bFullscreen) { // Set to full screen
+	// Avoid compiler warnings
+	if (!g_hWnd)
+		return;
 
-		// Get the first visible window in the Z order
-		g_hwndTopmost = GetTopWindow(NULL);
-		GetWindowTextA(g_hwndTopmost, (LPSTR)tmp, 256); // hwnd can be null
-		do {
-			if (g_hwndTopmost && tmp[0] && IsWindowVisible(g_hwndTopmost)
-				&& GetWindowLong(g_hwndTopmost, GWL_EXSTYLE) & WS_EX_TOPMOST) {
-				break;
-			}
-			g_hwndTopmost = GetNextWindow(g_hwndTopmost, GW_HWNDNEXT);
-			GetWindowTextA(g_hwndTopmost, (LPSTR)tmp, 256);
-		} while (g_hwndTopmost != NULL); // g_hwndTopmost is NULL if GetNextWindow finds no more windows
+	if (bEnable) { // Set to full screen or preview
+
+		// g_hwndTopmost is set by user selection "Show on top"
+		if (g_hwndTopmost) {
+			hwndTopmost = g_hwndTopmost;
+		}
+		else {
+			//
+			// Find the current topmost window - if any.
+			//
+			// Get the first visible window in the Z order
+			hwndTopmost = GetTopWindow(NULL);
+			GetWindowTextA(hwndTopmost, (LPSTR)tmp, 256); // hwnd can be null
+			do {
+				if (hwndTopmost && tmp[0] && IsWindowVisible(g_hwndTopmost)
+					&& GetWindowLong(hwndTopmost, GWL_EXSTYLE) & WS_EX_TOPMOST) {
+					break;
+				}
+				else {
+					if (hwndTopmost) {
+						// Get next window
+						hwndTopmost = GetNextWindow(hwndTopmost, GW_HWNDNEXT);
+						if (hwndTopmost) {
+							// If we got it, save the title
+							GetWindowTextA(hwndTopmost, (LPSTR)tmp, 256);
+						}
+						else {
+							break; // no more windows
+						}
+					}
+					else {
+						break;
+					}
+				}
+			} while (hwndTopmost != NULL); // hwndTopmost is NULL if GetNextWindow finds no more windows
+		}
 
 		// Get the client/window adjustment values
 		GetWindowRect(g_hWnd, &windowRect);
@@ -644,33 +701,60 @@ void ofApp::doFullScreen(bool bFullscreen)
 		// Put the taskbar lowest Z order
 		SetWindowPos(hWndTaskBar, HWND_NOTOPMOST, 0, 0, (rectTaskBar.right - rectTaskBar.left), (rectTaskBar.bottom - rectTaskBar.top), SWP_NOMOVE | SWP_NOSIZE);
 
-		// If it's on a different monitor, make it fullscreen on that monitor.
-		// Thanks to Tim Thompson for resolving this
-		HMONITOR monitor = MonitorFromWindow(g_hWnd, MONITOR_DEFAULTTOPRIMARY);
-		MONITORINFO mi;
-		mi.cbSize = sizeof(mi);
-		GetMonitorInfoA(monitor, &mi);
-		int x = (int)mi.rcMonitor.left;
-		int y = (int)mi.rcMonitor.top;
-		int w = (int)(mi.rcMonitor.right - mi.rcMonitor.left); // rcMonitor dimensions are LONG
-		int h = (int)(mi.rcMonitor.bottom - mi.rcMonitor.top);
+		int x = 0;
+		int y = 0;
+		int w = 0;
+		int h = 0;
+
+		// PREVIEW
+		if (bPreviewMode) {
+			x = (int)windowRect.left
+				+ GetSystemMetrics(SM_CXBORDER) * 2
+				+ GetSystemMetrics(SM_CXFRAME)
+				+ GetSystemMetrics(SM_CXDLGFRAME);
+			y = (int)windowRect.top
+				+ GetSystemMetrics(SM_CYCAPTION)
+				+ GetSystemMetrics(SM_CYMENU)
+				+ GetSystemMetrics(SM_CYBORDER) * 2
+				+ GetSystemMetrics(SM_CYFRAME)
+				+ GetSystemMetrics(SM_CYDLGFRAME);
+			w = (int)(clientRect.right - clientRect.left);
+			h = (int)(clientRect.bottom - clientRect.top);
+		}
+		else {
+			// FULL SCREEN
+			// If it's on a different monitor, make it fullscreen on that monitor.
+			// Thanks to Tim Thompson for resolving this
+			HMONITOR monitor = MonitorFromWindow(g_hWnd, MONITOR_DEFAULTTOPRIMARY);
+			MONITORINFO mi;
+			mi.cbSize = sizeof(mi);
+			GetMonitorInfoA(monitor, &mi);
+			x = (int)mi.rcMonitor.left;
+			y = (int)mi.rcMonitor.top;
+			w = (int)(mi.rcMonitor.right - mi.rcMonitor.left); // rcMonitor dimensions are LONG
+			h = (int)(mi.rcMonitor.bottom - mi.rcMonitor.top);
+		}
 
 		// Hide the window while re-sizing
 		ShowWindow(g_hWnd, SW_HIDE);
-		
-		// SetWindowPos HWND_TOPMOST can cause a grey screen for Windows 10 
-		// if scaling is set larger than 100% e.g. 125%
-		// Also there seems to be a delay in receiving keystrokes even if set to 100%
-		// This seems to fix it.
-		SetWindowPos(g_hWnd, HWND_NOTOPMOST, x, y, w, h, SWP_SHOWWINDOW);
-		SetWindowPos(g_hWnd, HWND_TOP, x, y, w, h, SWP_SHOWWINDOW);
+
+		// hwndTopmost is either the g_hwndTopmost, user selection "Show on top", or found above
+		if (hwndTopmost && g_hWnd == hwndTopmost) {
+			SetWindowPos(g_hWnd, HWND_TOPMOST, x, y, w, h, SWP_SHOWWINDOW);
+		}
+		else {
+			// Double SetWindowPos avoids a grey screen with Windows 10
+			// if scaling is greater than 100%. This could be resolved eventually.
+			SetWindowPos(g_hWnd, HWND_NOTOPMOST, x, y, w, h, SWP_SHOWWINDOW);
+			SetWindowPos(g_hWnd, HWND_TOP, x, y, w, h, SWP_SHOWWINDOW);
+		}
 		ShowCursor(FALSE);
 
 		ShowWindow(g_hWnd, SW_SHOW);
 		SetFocus(g_hWnd);
 
 	}
-	else { // Exit full screen
+	else { // Exit full screen or preview
 
 		// Restore original style
 		SetWindowLongPtrA(g_hWnd, GWL_STYLE, g_dwStyle);
@@ -761,7 +845,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
 	char tmp[MAX_PATH];
-	char fname[MAX_PATH];
+	// char fname[MAX_PATH];
 	char about[1024];
 	DWORD dummy, dwSize, dwVersion = 0;
 
@@ -774,7 +858,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	case WM_INITDIALOG:
 
-		sprintf_s(about, 256, "Spout demo program\r\n    Version ");
+		sprintf_s(about, 256, "Spout demo program\r\nVersion ");
 		// Get product version number
 		if (GetModuleFileNameA(hInstance, tmp, MAX_PATH)) {
 			dwSize = GetFileVersionInfoSizeA(tmp, &dummy);
@@ -797,20 +881,8 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			spoutVersion = (int)dwVersion; // 0 for earlier than 2.005
 
 		if (spoutVersion > 0) {
-			sprintf_s(tmp, 256, "Spout 2.00%1d", (spoutVersion - 2000));
+			sprintf_s(tmp, 256, "Spout 2.00%1d\r\n", (spoutVersion - 2000));
 			strcat_s(about, 1024, tmp);
-			// Check Spout installation
-			if (ReadPathFromRegistry(HKEY_CURRENT_USER, "Software\\Leading Edge\\SpoutPanel", "InstallPath", fname)) {
-				// Does the SpoutPanel path have "Program Files" in it ?
-				if (strstr(fname, "Program Files"))
-					sprintf_s(tmp, 256, " installed\r\n");
-				else
-					sprintf_s(tmp, 256, " portable\r\n");
-				strcat_s(about, 1024, tmp);
-			}
-			else {
-				strcat_s(about, 1024, "\r\n");
-			}
 		}
 		else {
 			sprintf_s(tmp, 256, "Spout 2.004 or earlier\r\n");

@@ -22,8 +22,8 @@ ofxSkyBox();
 	void draw();
     void Draw_Skybox(float x, float y, float z, float width, float height, float length);
 
-    ofxCubeMap cubeMap;
-	ofShader cubeshader;
+    ofxCubeMap cubeMap{};
+	ofShader cubeshader{};
 
 };
 

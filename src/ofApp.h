@@ -2,7 +2,7 @@
 
 	Spout OpenFrameworks Demo program
 
-	Copyright (C) 2020-2021 Lynn Jarvis.
+	Copyright (C) 2020-2022 Lynn Jarvis.
 
 	This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -20,7 +20,8 @@
 */
 #pragma once
 
-#define BUILDRECEIVER
+// Enable this define to create a receiver rather than the default sender
+// #define BUILDRECEIVER
 
 #include "ofMain.h"
 #include "Addons\ofxSkybox\ofxSkyBox.h" // Skybox addon
@@ -54,36 +55,42 @@ class ofApp : public ofBaseApp{
 		SpoutSender sender;
 #endif
 
-		char senderName[256];  // Sender name
-		unsigned int senderWidth; // Dimensions of the sender can be independent
-		unsigned int senderHeight; // of the application window if using an fbo
+		//
+		// Initialize member variables
+		//
 
-		ofImage myBoxImage;    // Image for the 3D demo
-		ofFbo myFbo;           // For texture sharing
-		float rotX, rotY;
+		char senderName[256]{};
+		unsigned int senderWidth = 0; // Dimensions of the sender can be independent
+		unsigned int senderHeight = 0; // of the application window if using an fbo
 
-		bool bTopmost;
-		bool bFullScreen;
-		bool bShowInfo;
+		ofImage myBoxImage{};    // Image for the 3D demo
+		ofFbo myFbo{};           // For texture sharing
+		float rotX = 0;
+		float rotY = 0;
+
+		bool bTopmost = false;
+		bool bFullScreen = false;
+		bool bPreview = false;
+		bool bShowInfo = true;
 
 		// These are all for restoring from full screen
-		RECT windowRect; // Window rectangle
-		RECT clientRect; // Client rectangle
-		int nonFullScreenX; // Window position
-		int nonFullScreenY;
-		unsigned int AddX, AddY; // adjustment to client rect for reset of window size
-		HWND g_hwndForeground; // foreground window before setting topmost
-		HWND g_hwndTopmost; // topmost window before setting full screen
-		HMENU g_hMenu; // Original menu
-		DWORD g_dwStyle; // Original style
+		RECT windowRect{}; // Window rectangle
+		RECT clientRect{}; // Client rectangle
+		int nonFullScreenX = 0; // Window position
+		int nonFullScreenY = 0;
+		unsigned int AddX, AddY = 0; // adjustment to client rect for reset of window size
+		HWND g_hwndForeground = NULL; // foreground window before setting topmost
+		HWND g_hwndTopmost = NULL; // topmost window before setting full screen
+		HMENU g_hMenu = NULL; // Original menu
+		DWORD g_dwStyle = 0; // Original style
 		
 		void appMenuFunction(string title, bool bChecked);
-		void doFullScreen(bool bFullscreen);
+		void doFullScreen(bool bEnable, bool PreviewMode);
 		bool EnterSenderName(char *SenderName, char *caption);
 
-		ofTrueTypeFont myFont;
-		ofxWinMenu * menu;
-		ofxSkyBox skybox;
-		ofEasyCam easycam;
+		ofTrueTypeFont myFont{};
+		ofxWinMenu* menu{};
+		ofxSkyBox skybox{};
+		ofEasyCam easycam{};
 
 };

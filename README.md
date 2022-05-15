@@ -12,11 +12,11 @@ Uses the [ofxWinMenu](https://github.com/leadedge/ofxWinMenu) addon.
 
 The source for both of these is modified and included with the project.
 
-### Setup required for For Visual Studio 2017 and Openframeworks 11.
+### Setup required for For Visual Studio 2022 and Openframeworks 11.2
   
   1) Download [Openframeworks for Windows and Visual Studio](https://openframeworks.cc/download)
   2) Unzip the files to get a folder containing Openframeworks\
-       e.g. "of_v0.11.0_vs2017_release"
+       e.g. "of_v0.11.2_vs2017_release.zip"
   3) Copy the folder to a convenient location and rename it as you wish\
        e.g. somefolder\OPENFRAMEWORKS11
   4) Download the ["beta"](https://github.com/leadedge/Spout2/tree/beta) branch of the Spout SDK
@@ -47,7 +47,7 @@ OPENFRAMEWORKS11\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;images\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shaders
                  
-Open "ofSpoutDemo.sln" with Visual Studio 2017 and set to "Release"\
+Open "ofSpoutDemo.sln" with Visual Studio 2022 and set to "Release"\
  
 The first time you use Openframeworks you have to compile the library\
 RH click on "openframeworksLib" - Build\
@@ -68,6 +68,8 @@ Find in ofApp.h :\
 The code may contain experimental functions which are not documented\
 As many comments as possible are included in the source files.\
 15.06.21 - added snapshot to receiver
+16.05.22 - update to VS2022 and OF 11.2
+
 
 
 
