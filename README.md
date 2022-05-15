@@ -1,7 +1,7 @@
 # ofSpoutDemo
 Spout Openframeworks Demo program
 
-Please note that this program is not the same as the demo programs provided with the Spout distribution. Nevertheless it could also be useful for other purposes. The receiver includes an image snapshot with the F12 key. Images are saved in bin>data. Default extension is ".jpg". You can specify any image type supported by Openframeworks.
+Please note that this program is not the same as the demo programs provided with the Spout distribution. Nevertheless it could also be useful for other purposes. The receiver includes an image snapshot with the F12 key. Images are saved in bin>data. Default extension is ".jpg". With the File menu option you can specify any name and any image type supported by Openframeworks.
 
 The project requires the files from the Spout SDK "beta" branch as detailed below.
 
@@ -67,9 +67,17 @@ Find in ofApp.h :\
 
 The code may contain experimental functions which are not documented\
 As many comments as possible are included in the source files.\
+<<<<<<< HEAD
 15.06.21 - added snapshot to receiver
 16.05.22 - update to VS2022 and OF 11.2
 
+=======
+15.06.21\
+&nbsp;&nbsp;added snapshot to receiver\
+16.06.21\
+&nbsp;&nbsp;Add "Save image" and ""Open data folder" to receiver file menu\
+&nbsp;&nbsp;Auto create image name for F12
+>>>>>>> fa0b3c326e0d54d738df88ff1c5c1cfc04d1dda4
 
 
 
