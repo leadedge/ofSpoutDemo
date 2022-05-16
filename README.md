@@ -67,17 +67,12 @@ Find in ofApp.h :\
 
 The code may contain experimental functions which are not documented\
 As many comments as possible are included in the source files.\
-<<<<<<< HEAD
-15.06.21 - added snapshot to receiver
-16.05.22 - update to VS2022 and OF 11.2
-
-=======
 15.06.21\
 &nbsp;&nbsp;added snapshot to receiver\
 16.06.21\
 &nbsp;&nbsp;Add "Save image" and ""Open data folder" to receiver file menu\
-&nbsp;&nbsp;Auto create image name for F12
->>>>>>> fa0b3c326e0d54d738df88ff1c5c1cfc04d1dda4
-
+&nbsp;&nbsp;Auto create image name for F12\
+16.05.22\
+&nbsp;&nbsp;Update to VS2022 and OF 11.2
 
 
