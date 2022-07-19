@@ -33,6 +33,10 @@
 	28.04.22 - Add MessageBox warning if SpoutPanel is not found (Spout.cpp).
 			   Rebuild x64 /MD. Provide required dlls in executable folder.
 	           Version 1.008
+	18.07.22 - Receiver allow for 16 bit sender textures and image save
+			   Update SetClassLong to SetClassLongPtr
+			   Changed F12 snapshot messagebox timeout from 4 to 2.5 seconds
+			   Version 1.009
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -84,7 +88,7 @@ void ofApp::setup(){
 	// Show the application title
 	ofSetWindowTitle(senderName);
 	// OpenSpoutConsole(); // Empty console for debugging
-	EnableSpoutLog(); // Log to console
+	// EnableSpoutLog(); // Log to console
 	// SetSpoutLogLevel(SpoutLogLevel::SPOUT_LOG_WARNING); // Log warnings only
 	// EnableSpoutLogFile(senderName); // Log to file
 
@@ -95,7 +99,7 @@ void ofApp::setup(){
 	g_hWnd = ofGetWin32Window();
 
 	// Set a custom window icon
-	SetClassLongA(g_hWnd, GCLP_HICON, (LONGLONG)LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
+	SetClassLongPtrA(g_hWnd, GCLP_HICON, (LONG_PTR)LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
 
 	// Load a font rather than the default
 	if(!myFont.load("fonts/DejaVuSans.ttf", 12, true, true))
@@ -180,14 +184,13 @@ void ofApp::setup(){
 	senderWidth = ofGetWidth();
 	senderHeight = ofGetHeight();
 
-	// Create an RGBA fbo for texture transfers
-	myFbo.allocate(senderWidth, senderHeight, GL_RGBA);
-
 #ifdef BUILDRECEIVER
 	// Allocate an RGBA texture to receive from the sender
 	// It can be resized later to match the sender - see Update()
 	myTexture.allocate(senderWidth, senderHeight, GL_RGBA);
 #else
+	// Create an RGBA fbo for texture transfers
+	myFbo.allocate(senderWidth, senderHeight, GL_RGBA);
 	// Give the sender a name (if no name is specified, the executable name is used)
 	sender.SetSenderName(senderName);
 #endif
@@ -216,7 +219,23 @@ void ofApp::update() {
 	// If IsUpdated() returns true, the sender size has changed
 	// and the receiving texture must be re-sized.
 	if (receiver.IsUpdated()) {
-		myTexture.allocate(receiver.GetSenderWidth(), receiver.GetSenderHeight(), GL_RGBA);
+		// Re-allocate the receving OpenGL texture to match the
+		// dimensions and DirectX texture format of the sender
+		// Allow for 8 and 16 bit textures
+		DWORD dwFormat = receiver.GetSenderFormat();
+		myTextureFormat = GL_RGBA; // default 8 bit
+		switch (dwFormat) {
+		case 10: // 16 bit float DXGI_FORMAT_R16G16B16A16_FLOAT
+		case 11: // 16 bit unorm DXGI_FORMAT_R16G16B16A16_UNORM
+		case 13: // 16 bit snorm DXGI_FORMAT_R16G16B16A16_SNORM
+		case 24: // 10 bit unorm DXGI_FORMAT_R10G10B10A2_UNORM
+			myTextureFormat = GL_RGBA16;
+			break;
+		default:
+			break;
+
+		}
+		myTexture.allocate(receiver.GetSenderWidth(), receiver.GetSenderHeight(), myTextureFormat);
 	}
 #else
 
@@ -315,7 +334,7 @@ void ofApp::draw() {
 	myFbo.begin();
 
 	// Clear to reset the background and depth buffer
-	ofClear(0, 0, 0, 255);
+	ofClear(0, 16, 64, 255);
 
 	// Draw the skybox
 	easycam.begin();
@@ -460,22 +479,37 @@ void ofApp::keyPressed(int key) {
 		{
 			// Make a timestamped image file name
 			std::string imagename = receiver.GetSenderName();
-			imagename += "_" + ofGetTimestampString() + ".jpg"; // jpg default
-			// Get pixels from received texture
-			ofImage myImage;
-			myTexture.readToPixels(myImage.getPixels());
+
 			// Save image to bin>data>captures
 			std::string savepath = "captures\\";
-			savepath += imagename;
-			myImage.save(savepath);
+
+			// Get pixels from received texture
+			// Sender texture format determines image and file type
+			if (myTextureFormat == GL_RGBA16) {
+				ofShortImage myImage; // Bit depth 16 bits
+				myTexture.readToPixels(myImage.getPixels());
+				// TIFF image
+				imagename += "_" + ofGetTimestampString() + ".tif";
+				savepath += imagename;
+				myImage.save(savepath);
+			}
+			else {
+				ofImage myImage; // Bit depth 8 bits
+				myTexture.readToPixels(myImage.getPixels());
+				// PNG image
+				imagename += "_" + ofGetTimestampString() + ".png";
+				savepath += imagename;
+				myImage.save(savepath);
+			}
+
+			// Spout timeout messagebox with 2 second delay
 			char tmp[256];
 			sprintf_s(tmp, "Saved : %s", savepath.c_str());
-			// Use SpoutUtils (SpoutPanel) timeout messagebox with 4 second delay
-			SpoutMessageBox(NULL, savepath.c_str(), "Message", MB_OK, 4000);
+			SpoutMessageBox(NULL, savepath.c_str(), "Message", MB_OK, 2500);
 
-		}
+}
 		else {
-			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1400);
+			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1500);
 		}
 	}
 
@@ -521,33 +555,64 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	//
 
 #ifdef BUILDRECEIVER
+
 	if (title == "Save image") {
 		if (receiver.IsConnected())
 		{
 			char imagename[MAX_PATH];
 			imagename[0] = 0; // No existing name
 			if (EnterSenderName(imagename, "Image name")) {
-				std::string name = imagename;
-				// Ad an extension if none entered
-				std::size_t found = name.find('.');
-				if (found == std::string::npos)
-					name += ".jpg";
-				ofImage myImage;
-				myTexture.readToPixels(myImage.getPixels());
-				// Save to bin>data
-				myImage.save(name);
+
+				std::string savepath = imagename;
+
+				// Add default png extension if none entered
+				std::size_t f = savepath.find('.');
+				if (f == std::string::npos)
+					savepath += ".png";
+
+				// Only png and tif support 16 bit
+				if (myTextureFormat == GL_RGBA16 && !(savepath.find(".png") || savepath.find(".tif"))) {
+					savepath = savepath.substr(0, f);
+					savepath += ".tif";
+				}
+
+				// Path for existence check
+				savepath = ofToDataPath(savepath);
+				if (PathFileExistsA(savepath.c_str())) {
+					if (MessageBoxA(NULL, "Image file exists\nOverwrite ?", "Warning", MB_YESNO) == IDNO)
+						return;
+				}
+
+				// Get pixels from received texture
+				// Sender texture format determines image type
+				if (myTextureFormat == GL_RGBA16) {
+					ofShortImage myShortImage; // Bit depth 16 bits
+					myTexture.readToPixels(myShortImage.getPixels());
+					myShortImage.save(savepath);
+				}
+				else {
+					ofImage myImage; // Bit depth 8 bits
+					myTexture.readToPixels(myImage.getPixels());
+					myImage.save(savepath);
+				}
+				char tmp[256];
+				sprintf_s(tmp, "Saved : %s", savepath.c_str());
+				SpoutMessageBox(NULL, savepath.c_str(), "Message", MB_OK, 2500);
 			}
 		}
 		else {
-			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1400);
+			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1500);
 		}
 	}
+
 	if (title == "Open data folder") {
 		std::string datapath = ofFilePath::getCurrentExeDir();
 		datapath += "\\data";
 		ShellExecuteA(ofGetWin32Window(), "open", datapath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 	}
+
 #else
+
 	if (title == "Sender name") {
 		char sendername[256]; // Name comparison
 		strcpy_s(sendername, senderName);

@@ -51,6 +51,7 @@ class ofApp : public ofBaseApp{
 #ifdef BUILDRECEIVER
 		SpoutReceiver receiver;
 		ofTexture myTexture; // Receiving texture
+		int myTextureFormat = GL_RGBA; // Texture format default 8 bit
 #else
 		SpoutSender sender;
 #endif
