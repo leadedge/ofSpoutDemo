@@ -2,7 +2,7 @@
 
 	Spout OpenFrameworks Demo program
 
-	Copyright (C) 2020-2022 Lynn Jarvis.
+	Copyright (C) 2020-2023 Lynn Jarvis.
 
 	This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -21,18 +21,13 @@
 #pragma once
 
 // Enable this define to create a receiver rather than the default sender
-// #define BUILDRECEIVER
+#define BUILDRECEIVER
 
 #include "ofMain.h"
 #include "Addons\ofxSkybox\ofxSkyBox.h" // Skybox addon
 #include "Addons\ofxWinMenu\ofxWinMenu.h" // Windows menu addon
 #include "resource.h"
-
-#ifdef BUILDRECEIVER
-#include "..\apps\SpoutGL\SpoutReceiver.h"
-#else
-#include "..\apps\SpoutGL\SpoutSender.h"
-#endif
+#include "..\apps\SpoutGL\Spout.h" // Common for receiver and sender
 
 // For about box graphics adapter display
 static int adapterIndex; // Current graphics adapter index
@@ -49,11 +44,10 @@ class ofApp : public ofBaseApp{
 		void windowResized(int w, int h);
 
 #ifdef BUILDRECEIVER
-		SpoutReceiver receiver;
+		Spout receiver;
 		ofTexture myTexture; // Receiving texture
-		int myTextureFormat = GL_RGBA; // Texture format default 8 bit
 #else
-		SpoutSender sender;
+		Spout sender;
 #endif
 
 		//
@@ -63,16 +57,24 @@ class ofApp : public ofBaseApp{
 		char senderName[256]{};
 		unsigned int senderWidth = 0; // Dimensions of the sender can be independent
 		unsigned int senderHeight = 0; // of the application window if using an fbo
-
-		ofImage myBoxImage{};    // Image for the 3D demo
-		ofFbo myFbo{};           // For texture sharing
+		double g_SenderFps = 0.0; // For fps display averaging
+		ofImage myBoxImage{}; // Image for the 3D demo
+		ofFbo myFbo{}; // For texture sharing
 		float rotX = 0;
 		float rotY = 0;
+		GLint glFormat = GL_RGBA; // Default OpenGL texture format
 
 		bool bTopmost = false;
 		bool bFullScreen = false;
 		bool bPreview = false;
 		bool bShowInfo = true;
+
+		bool bRecording = false; // Show "recording" on-screen
+		bool bAudio = false; // Record system audio with video
+		bool bRgb = false; // RGB video data instead of RGBA
+		bool bPrompt = false; // Prompt for file name
+		std::string extension = ".png"; // Capture type
+
 
 		// These are all for restoring from full screen
 		RECT windowRect{}; // Window rectangle
@@ -84,14 +86,17 @@ class ofApp : public ofBaseApp{
 		HWND g_hwndTopmost = NULL; // topmost window before setting full screen
 		HMENU g_hMenu = NULL; // Original menu
 		DWORD g_dwStyle = 0; // Original style
+		char g_Initfile[MAX_PATH]={0};
+
 		
 		void appMenuFunction(string title, bool bChecked);
 		void doFullScreen(bool bEnable, bool PreviewMode);
+		void WriteInitFile(const char* initfile);
+		void ReadInitFile(const char* initfile);
 		bool EnterSenderName(char *SenderName, char *caption);
 
 		ofTrueTypeFont myFont{};
 		ofxWinMenu* menu{};
 		ofxSkyBox skybox{};
 		ofEasyCam easycam{};
-
 };

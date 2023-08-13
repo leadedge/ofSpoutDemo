@@ -6,7 +6,7 @@
     OpenFrameworks 11.1
     Visual Studio 2022
 
-    Copyright (C) 2020-2022 Lynn Jarvis.
+    Copyright (C) 2020-2023 Lynn Jarvis.
 
     This program can be used to test Spout development code.
     See also GitHub user project (https://github.com/leadedge/ofSpoutDemo)
@@ -37,6 +37,22 @@
 			   Update SetClassLong to SetClassLongPtr
 			   Changed F12 snapshot messagebox timeout from 4 to 2.5 seconds
 			   Version 1.009
+	30.11.22 - Averaging to stabilise fps display
+			   DoFullScreen :
+				 Removed TaskBar Z-order change
+				 Fix for slow rendering if resized exactly to monitor extents
+			   Test receiver connected before fullscreen of preview
+	09.12.22 - AboutBox 
+			     Correct Spout version for latest major/minor/release
+				 numbering in registry. Use GetSpoutSDK string instead.
+			     Change SetClassLong to SetClassLongPtr
+			   Code cleanup
+			   Version 1.010
+	05.08.23 - Options for OpenGL sending and receiving format
+	12.08.23 - Video recording with options for audio/rgb/prompt
+	13.08.23 - Add ini file to save/restore settings
+			   Capture menu with options for capture and image type
+			   Version 1.011
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -91,6 +107,7 @@ void ofApp::setup(){
 	// EnableSpoutLog(); // Log to console
 	// SetSpoutLogLevel(SpoutLogLevel::SPOUT_LOG_WARNING); // Log warnings only
 	// EnableSpoutLogFile(senderName); // Log to file
+	// printf("ofSpoutDemo\n");
 
 	// Instance
 	g_hInstance = GetModuleHandle(NULL);
@@ -125,14 +142,38 @@ void ofApp::setup(){
 	// "File" popup menu
 	//
 	HMENU hPopup = menu->AddPopupMenu(g_hMenu, "File");
-#ifdef BUILDRECEIVER
 	menu->AddPopupItem(hPopup, "Save image", false, false);
-	menu->AddPopupItem(hPopup, "Open data folder", false, false);
+#ifdef BUILDRECEIVER
+
+	HMENU hCapture = menu->AddPopupMenu(g_hMenu, "Capture");
+	// Capture type
+	HMENU hSubMenu = menu->AddPopupMenu(hCapture, "Capture type");
+	menu->AddPopupItem(hSubMenu, "PNG", false);
+	menu->AddPopupItem(hSubMenu, "TIF", false); // Not checked and auto-check
+	menu->AddPopupSeparator(hCapture);
+	menu->AddPopupItem(hCapture, "Capture image", false, false);
+	// Data folder for capture images
+	menu->AddPopupSeparator(hCapture);
+	menu->AddPopupItem(hCapture, "Open capture folder", false, false);
+
+	//
+	// "Record" popup
+	//
+	HMENU hRecord = menu->AddPopupMenu(g_hMenu, "Record");
+	menu->AddPopupItem(hRecord, "Record system audio", false, true);
+	menu->AddPopupItem(hRecord, "RGB video data", false, true);
+	menu->AddPopupItem(hRecord, "Prompt for file name", false, true);
+	menu->AddPopupSeparator(hRecord);
+	menu->AddPopupItem(hRecord, "Start recording", false, false);
+	menu->AddPopupItem(hRecord, "Stop recording", false, false);
+	menu->AddPopupSeparator(hRecord);
+	menu->AddPopupItem(hRecord, "Open video folder", false, false);
+
 #else
 	menu->AddPopupItem(hPopup, "Sender name", false, false);
-#endif
-	// Final File popup menu item is "Exit" - add a separator before it
 	menu->AddPopupSeparator(hPopup);
+#endif
+	// Final File popup menu item is "Exit"
 	menu->AddPopupItem(hPopup, "Exit", false, false);
 
 	//
@@ -184,16 +225,70 @@ void ofApp::setup(){
 	senderWidth = ofGetWidth();
 	senderHeight = ofGetHeight();
 
+	// Application OpenGL format
+	// Sender   : see SetSenderFormat below
+	// Receiver : see ReceiveTexture/IsUpdated and Snapshot (F12 key)
+	glFormat = GL_RGBA;
+
 #ifdef BUILDRECEIVER
 	// Allocate an RGBA texture to receive from the sender
-	// It can be resized later to match the sender - see Update()
-	myTexture.allocate(senderWidth, senderHeight, GL_RGBA);
+	// It is re-allocated later to match the size and format of the sender.
+	myTexture.allocate(senderWidth, senderHeight, glFormat);
+	menu->EnablePopupItem("Stop recording", false);
+
+	// SpoutDemo.ini file path
+	GetModuleFileNameA(NULL, g_Initfile, MAX_PATH);
+	PathRemoveFileSpecA(g_Initfile);
+	strcat_s(g_Initfile, MAX_PATH, "\\SpoutDemo.ini");
+
+	// Read recording and capture settings
+	ReadInitFile(g_Initfile);
+
+	// Check menu items
+	menu->SetPopupItem("Record system audio", bAudio);
+	menu->SetPopupItem("RGB video data", bRgb);
+	menu->SetPopupItem("Prompt for file name", bPrompt);
+	if (extension == ".tif") {
+		menu->SetPopupItem("TIF", true);
+		menu->SetPopupItem("PNG", false);
+	}
+	else {
+		menu->SetPopupItem("TIF", false);
+		menu->SetPopupItem("PNG", true);
+	}
+
+
 #else
-	// Create an RGBA fbo for texture transfers
-	myFbo.allocate(senderWidth, senderHeight, GL_RGBA);
+	// ---------------------------------------------------------------------------
+	//
+	// Option
+	//
+	// Set the sender application OpenGL format
+	//       OpenGL                             Compatible DX11 format
+	//       GL_RGBA16    16 bit				(DXGI_FORMAT_R16G16B16A16_UNORM)			
+	//       GL_RGBA16F   16 bit float			(DXGI_FORMAT_R16G16B16A16_FLOAT)
+	//       GL_RGBA32F   32 bit float			(DXGI_FORMAT_R32G32B32A32_FLOAT)
+	//       GL_RGB10_A2  10 bit 2 bit alpha	(DXGI_FORMAT_R10G10B10A2_UNORM)
+	//       GL_RGBA       8 bit                (DXGI_FORMAT_R8G8B8A8_UNORM)
+	//
+	glFormat = GL_RGB16; // Example 16 bit rgba
+	//
+	// Set a compatible DirectX 11 shared texture format for the sender
+	// so that receivers get a texture with the same format.
+	// Note that some applications may not receive other formats.
+	sender.SetSenderFormat(sender.DX11format(glFormat));
+	//
+	// ---------------------------------------------------------------------------
+
+	// Create an fbo for texture transfers
+	myFbo.allocate(senderWidth, senderHeight, glFormat);
+
 	// Give the sender a name (if no name is specified, the executable name is used)
 	sender.SetSenderName(senderName);
 #endif
+
+	// Starting value for sender fps display
+	g_SenderFps = GetRefreshRate();
 
 	// Skybox setup
 	skybox.load();
@@ -209,35 +304,15 @@ void ofApp::setup(){
 	controlArea.scaleFromCenter(scale, scale);
 	easycam.setControlArea(controlArea);
 
+
 } // end setup
 
 
 //--------------------------------------------------------------
 void ofApp::update() {
 
-#ifdef BUILDRECEIVER
-	// If IsUpdated() returns true, the sender size has changed
-	// and the receiving texture must be re-sized.
-	if (receiver.IsUpdated()) {
-		// Re-allocate the receving OpenGL texture to match the
-		// dimensions and DirectX texture format of the sender
-		// Allow for 8 and 16 bit textures
-		DWORD dwFormat = receiver.GetSenderFormat();
-		myTextureFormat = GL_RGBA; // default 8 bit
-		switch (dwFormat) {
-		case 10: // 16 bit float DXGI_FORMAT_R16G16B16A16_FLOAT
-		case 11: // 16 bit unorm DXGI_FORMAT_R16G16B16A16_UNORM
-		case 13: // 16 bit snorm DXGI_FORMAT_R16G16B16A16_SNORM
-		case 24: // 10 bit unorm DXGI_FORMAT_R10G10B10A2_UNORM
-			myTextureFormat = GL_RGBA16;
-			break;
-		default:
-			break;
 
-		}
-		myTexture.allocate(receiver.GetSenderWidth(), receiver.GetSenderHeight(), myTextureFormat);
-	}
-#else
+#ifndef BUILDRECEIVER
 
 	// Double click reset of easycam position
 	ofVec3f pos = easycam.getPosition();
@@ -250,7 +325,7 @@ void ofApp::update() {
 	// The sender is updated on the next call to SendTexture (2.007 only)
 	if (senderWidth != (unsigned int)myFbo.getWidth()
 	 || senderHeight != (unsigned int)myFbo.getHeight()) {
-		myFbo.allocate(senderWidth, senderHeight, GL_RGBA);
+		myFbo.allocate(senderWidth, senderHeight, glFormat);
 		// Re-scale easycam control area
 		ofRectangle controlArea = easycam.getControlArea(); // Current viewport
 		float scale = (float)ofGetWidth() / (float)ofGetHeight();
@@ -259,7 +334,6 @@ void ofApp::update() {
 	}
 
 #endif
-
 
 }
 
@@ -275,59 +349,89 @@ void ofApp::draw() {
 
 	// ReceiveTexture connects to and receives from a sender
 	if (receiver.ReceiveTexture(myTexture.getTextureData().textureID, myTexture.getTextureData().textureTarget)) {
-		myTexture.draw(0, 0, ofGetWidth(), ofGetHeight());
+		// If IsUpdated() returns true, the sender size has changed
+		// and the receiving texture must be re-allocated.
+		if (receiver.IsUpdated()) {
+			// Allocate an application texture with the same OpenGL format as the sender
+			// The received texture format (glFormat) determines image capture bit depth and type
+			glFormat = receiver.GLDXformat();
+			myTexture.allocate(receiver.GetSenderWidth(), receiver.GetSenderHeight(), glFormat);
+			// Has the sender changed ?
+			if (strcmp(receiver.GetSenderName(), senderName) != 0) {
+				// Stop recording for a different sender
+				if (bRecording)
+					appMenuFunction("Stop recording", false);
+			}
+			strcpy_s(senderName, 256, receiver.GetSenderName());
+		}
 	}
 
+	myTexture.draw(0, 0, ofGetWidth(), ofGetHeight());
+
+	// Show on-screen details
 	if (bShowInfo && !bFullScreen && !bPreview) {
-
 		if (receiver.IsConnected()) {
-
 			ofSetColor(255);
-
-			std::string str = "[";
+			str = "[";
 			str += receiver.GetSenderName();
-			str += "]  ";
+			str += "]  (";
 			str += ofToString(receiver.GetSenderWidth()); str += "x";
-			str += ofToString(receiver.GetSenderHeight()); str += " ";
+			str += ofToString(receiver.GetSenderHeight()); str += " - ";
+			// Received texture OpenGL format
+			str += receiver.GLformatName(receiver.GLDXformat());
+			str += ")";
+			myFont.drawString(str, 20, 30);
 			// GetSenderFrame() will return false for senders < 2.007
 			// Frame counting can also be disabled in SpoutSettings
+			str.clear();
 			if (receiver.GetSenderFrame() > 0) {
-				str += " fps ";
+				str += "fps ";
 				str += ofToString((int)roundf(receiver.GetSenderFps()));
 				str += " frame  ";
 				str += ofToString(receiver.GetSenderFrame());
 			}
 			else {
 				// Show Openframeworks fps
-				str += " fps : " + ofToString((int)roundf(ofGetFrameRate()));
+				str += "fps : " + ofToString((int)roundf(ofGetFrameRate()));
 			}
-			myFont.drawString(str, 20, 30);
+
+			// Is the receiver using CPU sharing ?
+			if (receiver.GetCPUshare()) {
+				str += " - CPU share";
+			}
+			else {
+				str += " - Texture share";
+				// Graphics can still be incompatible if the user
+				// did not select "Auto" or "CPU" in SpoutSettings
+				if (!receiver.IsGLDXready())
+					str += " - Graphics not compatible)";
+			}
+			myFont.drawString(str, 20, 52);
+
+			// Show action keys
+			str = "F9 - start recording : F10 - stop recording : F12 - capture image";
+			myFont.drawString(str, 60, ofGetHeight() - 40);
+
+			// Show keyboard shortcuts
+			str = "RH click - select sender : f - fullscreen : p - preview : Space - hide info";
+			myFont.drawString(str, 40, ofGetHeight() - 18);
+
+			// Show video recording status
+			if (bRecording) {
+				ofSetColor(255, 255, 0);
+				str = "Recording";
+				myFont.drawString(str, ofGetWidth()-100, 30);
+			}
+
 		}
 		else {
 			myFont.drawString("No sender detected", 20, 30);
 		}
 
-		// Is the receiver using CPU sharing ?
-		if (receiver.GetCPUshare()) {
-			str = "CPU share";
-		}
-		else {
-			str = "Texture share";
-			// Graphics can still be incompatible if the user
-			// did not select "Auto" or "CPU" in SpoutSettings
-			if (!receiver.IsGLDXready())
-				str += " (Graphics not compatible)";
-		}
-		myFont.drawString(str, 20, 52);
-
-		// Show the keyboard shortcuts
-		str = "RH click sender : f - fullscreen : p - preview : Space - hide info";
-		myFont.drawString(str, 20, ofGetHeight() - 20);
 
 	} // endif show info
 
 #else
-
 	// - - - - - - - - - - - - - - - - 
 
 	// Draw 3D graphics into the fbo
@@ -354,21 +458,16 @@ void ofApp::draw() {
 	rotX += 0.6;
 	rotY += 0.6;
 
+	// Send fbo while bound
+	// The fbo texture is already inverted so set the invert option false
+	sender.SendFbo(myFbo.getId(), (unsigned int)myFbo.getWidth(), (unsigned int)myFbo.getHeight(), false);
+
 	myFbo.end();
 
 	// - - - - - - - - - - - - - - - - 
 
 	// Draw the result in the fbo sized to the application window
 	myFbo.draw(0, 0, ofGetWidth(), ofGetHeight());
-
-	//
-	// Send texture
-	//
-
-	// The fbo texture is already inverted so set the option false
-	sender.SendTexture(myFbo.getTexture().getTextureData().textureID,
-		myFbo.getTexture().getTextureData().textureTarget,
-		senderWidth, senderHeight, false);
 
 	// Show what it's sending
 	if (bShowInfo) {
@@ -377,22 +476,16 @@ void ofApp::draw() {
 		std::string str = "Sending as : ";
 		str += sender.GetName(); str += " (";
 		str += ofToString(sender.GetWidth()); str += "x";
-		str += ofToString(sender.GetHeight());
-		// Show sender fps and framecount if selected
-		if (sender.GetFrame() > 0) {
-			str += " fps ";
-			str += ofToString((int)roundf(sender.GetFps()));
-			str += " : frame  ";
-			str += ofToString(sender.GetFrame());
-		}
-		else {
-			// Show Openframeworks fps
-			str += " fps : " + ofToString((int)roundf(ofGetFrameRate()));
-		}
-		str += ")";
+		str += ofToString(sender.GetHeight()); str += ") ";
+		// Sender OpenGL texture format description
+		// for 16 bit and floating point types
+		GLint glformat = sender.GLDXformat();
+		if(glformat != GL_RGBA)
+			str += sender.GLformatName(sender.GLDXformat());
 		myFont.drawString(str, 20, 30);
 
 		// Is the sender using CPU sharing?
+		str.clear();
 		if (sender.GetCPUshare()) {
 			str = "CPU share";
 		}
@@ -401,9 +494,29 @@ void ofApp::draw() {
 			// Graphics can still be incompatible if the user
 			// did not select "Auto" or "CPU" in SpoutSettings
 			if (!sender.IsGLDXready())
-				str += " (Graphics not compatible)";
+				str = "(Graphics not compatible)";
 		}
+
+		// Show sender fps and framecount if selected
+		if (sender.GetFrame() > 0) {
+			str = "fps ";
+			// Average to stabilise fps display
+			g_SenderFps = g_SenderFps*.85 + 0.15*sender.GetFps();
+			// Round first or integer cast will truncate to the whole part
+			str += ofToString((int)(round(g_SenderFps)));
+			str += " : frame  ";
+			str += ofToString(sender.GetFrame());
+		}
+		else {
+			// Show Openframeworks fps
+			str = "fps : " + ofToString((int)roundf(ofGetFrameRate()));
+		}
+		str += " ";
 		myFont.drawString(str, 20, 52);
+
+		// Show the keyboard shortcuts
+		str = "Space - hide info";
+		myFont.drawString(str, 10, ofGetHeight() - 20);
 
 	} // endif show info
 
@@ -411,16 +524,18 @@ void ofApp::draw() {
 
 } // end Draw
 
-
 //--------------------------------------------------------------
 void ofApp::exit() {
 
 	// Close the sender or receiver on exit
 #ifdef BUILDRECEIVER
 	receiver.ReleaseReceiver();
+	// Save recording and capture settings
+	WriteInitFile(g_Initfile);
 #else
 	sender.ReleaseSender();
 #endif
+
 
 }
 
@@ -463,53 +578,34 @@ void ofApp::keyPressed(int key) {
 
 	// Preview
 	if (key == 'p' && !bFullScreen) {
-		bPreview = !bPreview;
-		doFullScreen(bPreview, true);
+		if (receiver.IsConnected()) {
+			bPreview = !bPreview;
+			doFullScreen(bPreview, true);
+		}
 	}
 
 	// Full screen
-	if(key == 'f' && !bPreview) {
-		bFullScreen = !bFullScreen;
-		doFullScreen(bFullScreen, false);
+	if (key == 'f' && !bPreview) {
+		if (receiver.IsConnected()) {
+			bFullScreen = !bFullScreen;
+			doFullScreen(bFullScreen, false);
+		}
 	}
 
-	// Snapshot - F12 key
-	if (key == OF_KEY_F12) {
-		if (receiver.IsConnected())
-		{
-			// Make a timestamped image file name
-			std::string imagename = receiver.GetSenderName();
-
-			// Save image to bin>data>captures
-			std::string savepath = "captures\\";
-
-			// Get pixels from received texture
-			// Sender texture format determines image and file type
-			if (myTextureFormat == GL_RGBA16) {
-				ofShortImage myImage; // Bit depth 16 bits
-				myTexture.readToPixels(myImage.getPixels());
-				// TIFF image
-				imagename += "_" + ofGetTimestampString() + ".tif";
-				savepath += imagename;
-				myImage.save(savepath);
-			}
-			else {
-				ofImage myImage; // Bit depth 8 bits
-				myTexture.readToPixels(myImage.getPixels());
-				// PNG image
-				imagename += "_" + ofGetTimestampString() + ".png";
-				savepath += imagename;
-				myImage.save(savepath);
-			}
-
-			// Spout timeout messagebox with 2 second delay
-			char tmp[256];
-			sprintf_s(tmp, "Saved : %s", savepath.c_str());
-			SpoutMessageBox(NULL, savepath.c_str(), "Message", MB_OK, 2500);
-
-}
-		else {
-			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1500);
+	// Capture and record
+	if (receiver.IsConnected() && !bFullScreen) {
+		// Recording - F9 / F10 keys
+		if (key == OF_KEY_F9) {
+			if (!bRecording)
+				appMenuFunction("Start recording", false);
+		}
+		if (key == OF_KEY_F10) {
+			if (bRecording)
+				appMenuFunction("Stop recording", false);
+		}
+		// Snapshot - F12 key
+		if (key == OF_KEY_F12) {
+			appMenuFunction("Capture image", false);
 		}
 	}
 
@@ -550,9 +646,7 @@ void ofApp::windowResized(int w, int h)
 // 
 void ofApp::appMenuFunction(string title, bool bChecked) {
 
-	//
-	// File menu
-	//
+
 
 #ifdef BUILDRECEIVER
 
@@ -561,53 +655,155 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 		{
 			char imagename[MAX_PATH];
 			imagename[0] = 0; // No existing name
-			if (EnterSenderName(imagename, "Image name")) {
-
-				std::string savepath = imagename;
-
-				// Add default png extension if none entered
-				std::size_t f = savepath.find('.');
-				if (f == std::string::npos)
-					savepath += ".png";
-
-				// Only png and tif support 16 bit
-				if (myTextureFormat == GL_RGBA16 && !(savepath.find(".png") || savepath.find(".tif"))) {
-					savepath = savepath.substr(0, f);
-					savepath += ".tif";
-				}
-
-				// Path for existence check
-				savepath = ofToDataPath(savepath);
-				if (PathFileExistsA(savepath.c_str())) {
-					if (MessageBoxA(NULL, "Image file exists\nOverwrite ?", "Warning", MB_YESNO) == IDNO)
-						return;
-				}
-
-				// Get pixels from received texture
-				// Sender texture format determines image type
-				if (myTextureFormat == GL_RGBA16) {
-					ofShortImage myShortImage; // Bit depth 16 bits
-					myTexture.readToPixels(myShortImage.getPixels());
-					myShortImage.save(savepath);
-				}
-				else {
-					ofImage myImage; // Bit depth 8 bits
-					myTexture.readToPixels(myImage.getPixels());
-					myImage.save(savepath);
-				}
-				char tmp[256];
-				sprintf_s(tmp, "Saved : %s", savepath.c_str());
-				SpoutMessageBox(NULL, savepath.c_str(), "Message", MB_OK, 2500);
+			if (EnterSenderName(imagename, "Enetr image name and extension")) {
+				std::string name = imagename;
+				// Ad an extension if none entered
+				std::size_t found = name.find('.');
+				if (found == std::string::npos)
+					name += ".png";
+				ofImage myImage;
+				myTexture.readToPixels(myImage.getPixels());
+				// Save to bin>data
+				myImage.save(name);
 			}
 		}
 		else {
-			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1500);
+			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1400);
 		}
 	}
 
-	if (title == "Open data folder") {
+	//
+	// Capture menu
+	//
+
+	// Capture type
+	if (title == "TIF") {
+		extension = ".tif";
+		menu->SetPopupItem("PNG", false);
+	}
+
+	if (title == "PNG") {
+		extension = ".png";
+		menu->SetPopupItem("TIF", false);
+	}
+
+	// Snapshot - F12 key
+	if (title == "Capture image") {
+
+		if (receiver.IsConnected() && !bFullScreen)
+		{
+			// Make a timestamped image file name
+			std::string imagename = receiver.GetSenderName();
+			imagename += "_" + ofGetTimestampString() + extension;
+
+			// Save image to bin>data>captures
+			std::string savepath = "captures\\";
+			savepath += imagename;
+
+			// Get pixels from received texture
+			// Sender texture format determines image type
+			// 16 or 8 bit depth, png or tif
+			// The application texture format is set in ReceiveTexture/IsUpdated
+			if (glFormat == GL_RGBA16
+				|| glFormat == GL_RGBA16F
+				|| glFormat == GL_RGBA32F) {
+				ofShortImage myImage; // Bit depth 16 bits
+				myTexture.readToPixels(myImage.getPixels());
+				myImage.save(savepath); // save png or tif
+			}
+			else if (glFormat == GL_RGBA) {
+				ofImage myImage; // Bit depth 8 bits
+				myTexture.readToPixels(myImage.getPixels());
+				myImage.save(savepath); // save png or tif
+			}
+			else {
+				SpoutMessageBox(NULL, "Unsupported format", "Spout Receiver", MB_OK | MB_ICONWARNING, 2000);
+				return;
+			}
+			// Spout timeout messagebox with 2 second delay
+			SpoutMessageBox(NULL, imagename.c_str(), "Saved image", MB_OK, 2000);
+		}
+		else {
+			SpoutMessageBox(NULL, "No sender\nImage capture not possible", "Spout Receiver", MB_OK | MB_ICONWARNING, 2000);
+		}
+	}
+
+	//
+	// Record menu
+	//
+
+	// Check if SpoutRecorder has been closed when a popup menu is opened
+	if (title == "WM_ENTERMENULOOP") {
+		if (bRecording) {
+			HWND hRecorder = FindWindowA(NULL, "SpoutRecorder");
+			if (!hRecorder) {
+				bRecording = false;
+				menu->EnablePopupItem("Start recording", true);
+				menu->EnablePopupItem("Stop recording", false);
+			}
+		}
+	}
+
+	if (title == "Start recording") {
+		bRecording = true;
+		if (receiver.IsConnected()) {
+			char name[MAX_PATH]={};
+			if (GetModuleFileNameA(GetCurrentModule(), name, MAX_PATH) > 0) {
+				PathRemoveFileSpecA(name);
+				strcat_s(name, MAX_PATH, "\\SpoutRecorder.exe");
+				// Does SpoutRecorder.exe exist ?
+				if (_access(name, 0) != -1) {
+					std::string args = "-start -hide";
+					if (bAudio) args += " -audio";
+					if (bRgb) args += " -rgb";
+					if (bPrompt) args += " -prompt";
+					ShellExecuteA(ofGetWin32Window(), "open", name, args.c_str(), NULL, SW_SHOWNORMAL);
+					menu->EnablePopupItem("Start recording", false);
+					menu->EnablePopupItem("Stop recording", true);
+				}
+				else {
+					SpoutMessageBox(NULL, "SpoutRecorder.exe not found", "File not found", MB_OK | MB_ICONWARNING);
+				}
+			}
+		}
+	}
+
+	if (title == "Stop recording") {
+		// Close the recorder if open
+		HWND hRecorder = FindWindowA(NULL, "SpoutRecorder");
+		if (hRecorder)
+			SetWindowTextA(hRecorder, "close");
+		bRecording = false;
+		menu->EnablePopupItem("Start recording", true);
+		menu->EnablePopupItem("Stop recording", false);
+		// Spout timeout messagebox with 2 second delay
+		if (receiver.IsConnected() && !bPrompt) {
+			std::string name = receiver.GetSenderName();
+			name += ".mp4";
+			SpoutMessageBox(NULL, name.c_str(), "Saved video", MB_OK, 2000);
+		}
+	}
+
+	if (title == "Record system audio") {
+		bAudio = bChecked;
+	}
+	if (title == "RGB video data") {
+		bRgb = bChecked;
+	}
+	if (title == "Prompt for file name") {
+		bPrompt = bChecked;
+	}
+
+
+	if (title == "Open capture folder") {
 		std::string datapath = ofFilePath::getCurrentExeDir();
-		datapath += "\\data";
+		datapath += "\\data\\captures";
+		ShellExecuteA(ofGetWin32Window(), "open", datapath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+	}
+
+	if (title == "Open video folder") {
+		std::string datapath = ofFilePath::getCurrentExeDir();
+		datapath += "\\data\\videos";
 		ShellExecuteA(ofGetWin32Window(), "open", datapath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 	}
 
@@ -638,15 +834,21 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	// Window menu
 	//
 
+#ifdef BUILDRECEIVER
 	if (title == "Preview") {
-		bPreview = !bPreview;
-		doFullScreen(bPreview, true);
+		if (receiver.IsConnected()) {
+			bPreview = !bPreview;
+			doFullScreen(bPreview, true);
+		}
 	}
 
 	if (title == "Full screen") {
-		bFullScreen = !bFullScreen;
-		doFullScreen(bFullScreen, false);
+		if (receiver.IsConnected()) {
+			bFullScreen = !bFullScreen;
+			doFullScreen(bFullScreen, false);
+		}
 	}
+#endif
 
 	if (title == "Show on top") {
 		bTopmost = bChecked;
@@ -693,9 +895,7 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 
 void ofApp::doFullScreen(bool bEnable, bool bPreviewMode)
 {
-	RECT rectTaskBar;
-	HWND hWndTaskBar = NULL;
-	char tmp[256]; tmp[0] = 0;
+	char tmp[256]={};
 	HWND hwndTopmost = NULL;
 
 	// Avoid compiler warnings
@@ -751,6 +951,7 @@ void ofApp::doFullScreen(bool bEnable, bool bPreviewMode)
 		GetWindowRect(g_hWnd, &windowRect);
 		GetClientRect(g_hWnd, &clientRect);
 
+
 		// Remove caption and borders
 		g_dwStyle = GetWindowLongPtrA(g_hWnd, GWL_STYLE);
 		SetWindowLongPtrA(g_hWnd, GWL_STYLE, WS_VISIBLE); // no other styles but visible
@@ -759,17 +960,7 @@ void ofApp::doFullScreen(bool bEnable, bool bPreviewMode)
 		g_hMenu = GetMenu(g_hWnd);
 		SetMenu(g_hWnd, NULL);
 
-		// Get the taskbar window handle
-		hWndTaskBar = FindWindowA("Shell_TrayWnd", "");
-		GetWindowRect(g_hWnd, &rectTaskBar);
-
-		// Put the taskbar lowest Z order
-		SetWindowPos(hWndTaskBar, HWND_NOTOPMOST, 0, 0, (rectTaskBar.right - rectTaskBar.left), (rectTaskBar.bottom - rectTaskBar.top), SWP_NOMOVE | SWP_NOSIZE);
-
-		int x = 0;
-		int y = 0;
-		int w = 0;
-		int h = 0;
+		int x = 0; int y = 0; int w = 0; int h = 0;
 
 		// PREVIEW
 		if (bPreviewMode) {
@@ -800,19 +991,13 @@ void ofApp::doFullScreen(bool bEnable, bool bPreviewMode)
 			h = (int)(mi.rcMonitor.bottom - mi.rcMonitor.top);
 		}
 
-		// Hide the window while re-sizing
+		// Hide the window while re-sizing to avoid a flash effect
 		ShowWindow(g_hWnd, SW_HIDE);
 
-		// hwndTopmost is either the g_hwndTopmost, user selection "Show on top", or found above
-		if (hwndTopmost && g_hWnd == hwndTopmost) {
-			SetWindowPos(g_hWnd, HWND_TOPMOST, x, y, w, h, SWP_SHOWWINDOW);
-		}
-		else {
-			// Double SetWindowPos avoids a grey screen with Windows 10
-			// if scaling is greater than 100%. This could be resolved eventually.
-			SetWindowPos(g_hWnd, HWND_NOTOPMOST, x, y, w, h, SWP_SHOWWINDOW);
-			SetWindowPos(g_hWnd, HWND_TOP, x, y, w, h, SWP_SHOWWINDOW);
-		}
+		// For reasons unknown, rendering is slow if the window is resized
+		// to the monitor extents. Making it 1 pixel larger seems to fix it.
+		SetWindowPos(g_hWnd, HWND_TOPMOST, x-1, y-1, w+2, h+2, SWP_SHOWWINDOW);
+
 		ShowCursor(FALSE);
 
 		ShowWindow(g_hWnd, SW_SHOW);
@@ -841,6 +1026,65 @@ void ofApp::doFullScreen(bool bEnable, bool bPreviewMode)
 
 }
 
+//--------------------------------------------------------------
+// Save a configuration file in the executable folder
+// Ini file is created if it does not exist
+void ofApp::WriteInitFile(const char* initfile)
+{
+	//
+	// OPTIONS
+	//
+
+	if (bAudio)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"0", (LPCSTR)initfile);
+
+	if (bRgb)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"RGB", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"RGB", (LPCSTR)"0", (LPCSTR)initfile);
+
+	if (bPrompt)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"0", (LPCSTR)initfile);
+
+	if(extension == ".tif")
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".tif", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".png", (LPCSTR)initfile);
+
+}
+
+//--------------------------------------------------------------
+// Read back settings from configuration file
+void ofApp::ReadInitFile(const char* initfile)
+{
+	char tmp[MAX_PATH]={0};
+
+	//
+	// OPTIONS
+	//
+
+	bAudio = false;
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Audio", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bAudio = (atoi(tmp) == 1);
+	if(bAudio)
+
+	bRgb = false;
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"RGB", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bRgb = (atoi(tmp) == 1);
+
+	bPrompt = false;
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Prompt", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bPrompt = (atoi(tmp) == 1);
+
+	extension = ".png";
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Imagetype", NULL, (LPSTR)tmp, 5, initfile);
+	if (tmp[0]) extension = tmp;
+
+}
 
 bool ofApp::EnterSenderName(char *SenderName, char *caption)
 {
@@ -867,6 +1111,7 @@ bool ofApp::EnterSenderName(char *SenderName, char *caption)
 	return false;
 
 }
+
 
 // Message handler for sender name entry for a sender
 INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
@@ -912,8 +1157,9 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	char tmp[MAX_PATH];
 	// char fname[MAX_PATH];
 	char about[1024];
-	DWORD dummy, dwSize, dwVersion = 0;
-
+	DWORD dummy = 0;
+	DWORD dwSize = 0;
+	DWORD dwVersion = 0;
 	LPDRAWITEMSTRUCT lpdis;
 	HWND hwnd = NULL;
 	HCURSOR cursorHand = NULL;
@@ -941,19 +1187,27 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 
 		// Get the Spout version
+		// Set by Spout Installer (2005, 2006, etc.) 
+		// or by SpoutSettings for 2.007 and later
 		spoutVersion = 0;
-		if (ReadDwordFromRegistry(HKEY_CURRENT_USER, "Software\\Leading Edge\\Spout", "Version", &dwVersion))
-			spoutVersion = (int)dwVersion; // 0 for earlier than 2.005
+		if (ReadDwordFromRegistry(HKEY_CURRENT_USER, "Software\\Leading Edge\\Spout", "Version", &dwVersion)) {
+			spoutVersion = (int)dwVersion;
+		}
 
-		if (spoutVersion > 0) {
+		if (spoutVersion == 0) {
+			sprintf_s(tmp, 256, "Spout 2.004 or earlier\r\n");
+			strcat_s(about, 1024, tmp);
+		}
+		else if (spoutVersion <= 2007) {
 			sprintf_s(tmp, 256, "Spout 2.00%1d\r\n", (spoutVersion - 2000));
 			strcat_s(about, 1024, tmp);
 		}
 		else {
-			sprintf_s(tmp, 256, "Spout 2.004 or earlier\r\n");
-			strcat_s(about, 1024, tmp);
+			// Contains major, minor and release - e.g. 2007009
+			// Use Spout SDK version string insted - e.g. 2.007.009
+			strcat_s(about, 1024, "Spout  ");
+			strcat_s(about, 1024, GetSDKversion().c_str());
 		}
-
 		SetDlgItemTextA(hDlg, IDC_ABOUT_TEXT, (LPCSTR)about);
 
 		// Graphics adapter index and name
@@ -963,7 +1217,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		// Hyperlink hand cursor
 		cursorHand = LoadCursor(NULL, IDC_HAND);
 		hwnd = GetDlgItem(hDlg, IDC_SPOUT_URL);
-		SetClassLongA(hwnd, GCLP_HCURSOR, (LONGLONG)cursorHand);
+		SetClassLongPtrA(hwnd, GCLP_HCURSOR, (LONG_PTR)cursorHand);
 		break;
 
 	case WM_DRAWITEM:
