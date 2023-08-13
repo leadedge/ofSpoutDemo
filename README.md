@@ -1,7 +1,7 @@
 # ofSpoutDemo
 Spout Openframeworks Demo program
 
-Please note that this program is not the same as the demo programs provided with the Spout distribution and is intended as an example of using Spout library functions and creating a menu using the [ofxWinMenu](https://github.com/leadedge/ofxWinMenu) addon. The receiver also includes image capture as well as video recording functions using [SpoutRecorder](https://github.com/leadedge/SpoutRecorder).
+Note that this program is not the same as the demo programs provided with the Spout distribution and is intended as an example of using Spout library functions and creating a menu using the [ofxWinMenu](https://github.com/leadedge/ofxWinMenu) addon. The receiver also includes image capture as well as video recording functions using [SpoutRecorder](https://github.com/leadedge/SpoutRecorder).
 
 ## Binaries
 
@@ -13,35 +13,35 @@ The latest [Release](https://github.com/leadedge/ofSpoutDemo/releases) contains 
 File > Save - saves images of the required type (jpg, png, bmp etc) to the bin>data.
 
 ### Capture menu
-*Capture type
+* Capture type\
 Image type for "F12" snapshot can be selected as either "tif" or "png".
-*Capture image
+* Capture image\
 Select this menu option or the "F12" key to capture an image. Using the "F12" key avoids freeze of the sender stream by the menu selection.
-*Open capture folder
+* Open capture folder\
 Opens file explorer to show captured images. Images are saved in bin>data>captures. 
 
 ### Record menu
-*Record system audio
+* Record system audio\
 Audio from the system audio device (speakers) is recorded along with the video using a virtual audio device developed by [Roger Pack](). The audio filters must be registered. Rfere to the "bin>data>audio folder for details.
-*RGB video data
+* RGB video data\
 Pixel data is RBGA by defult. This provides maximum epeed for capture from video memory. This option can be selected if RGB pixel type is required for compatibility with other software.
-*Prompt for file name
+* Prompt for file name\
 Videos are normally saved using the sender name to bin>data>videos. Select this option if another destination or video file name is required.
-*Start recording
+* Start recording\
 Select this menu option or the "F9" key to start recording. Using the "F9" key avoids interrupting the video by the menu selection.
-*Stop recording
+* Stop recording\
 Similarly this option ends recording and the "F10" key prevents the menu interrupting the video.
-*Open video fiolder
+* Open video folder\
 Opens file explorer to show recorded videos.
 
 ### Window menu
-*Show on top
+* Show on top\
 Make the window topmost.
-*Preview
+* Preview\
 Remove menu, caption and borders and keep the sender display topmost and at the position of the window.
-*Full screen
+* Full screen\
 Full screen display on the monitor wher the program was executed.
-*Show info
+* Show info\
 Show or hide the on-screen display.
 
 ## Building the project
