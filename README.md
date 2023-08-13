@@ -22,7 +22,7 @@ Opens file explorer to show captured images. Images are saved in bin>data>captur
 
 ### Record menu
 * Record system audio\
-Audio from the system audio device (speakers) is recorded along with the video using a virtual audio device developed by [Roger Pack](). The audio filters must be registered. Rfere to the "bin>data>audio folder for details.
+Audio from the system audio device (speakers) is recorded along with the video using a virtual audio device developed by [Roger Pack](https://github.com/rdp/virtual-audio-capture-grabber-device). The audio filters must be registered. Refer to the "bin>data>audio folder for details.
 * RGB video data\
 Pixel data is RBGA by defult. This provides maximum epeed for capture from video memory. This option can be selected if RGB pixel type is required for compatibility with other software.
 * Prompt for file name\
