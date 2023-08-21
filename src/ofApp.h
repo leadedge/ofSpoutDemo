@@ -24,9 +24,9 @@
 #define BUILDRECEIVER
 
 #include "ofMain.h"
+#include "resource.h"
 #include "Addons\ofxSkybox\ofxSkyBox.h" // Skybox addon
 #include "Addons\ofxWinMenu\ofxWinMenu.h" // Windows menu addon
-#include "resource.h"
 #include "..\apps\SpoutGL\Spout.h" // Common for receiver and sender
 
 // For about box graphics adapter display
@@ -49,11 +49,7 @@ class ofApp : public ofBaseApp{
 #else
 		Spout sender;
 #endif
-
-		//
-		// Initialize member variables
-		//
-
+	
 		char senderName[256]{};
 		unsigned int senderWidth = 0; // Dimensions of the sender can be independent
 		unsigned int senderHeight = 0; // of the application window if using an fbo
@@ -68,13 +64,7 @@ class ofApp : public ofBaseApp{
 		bool bFullScreen = false;
 		bool bPreview = false;
 		bool bShowInfo = true;
-
-		bool bRecording = false; // Show "recording" on-screen
-		bool bAudio = false; // Record system audio with video
-		bool bRgb = false; // RGB video data instead of RGBA
-		bool bPrompt = false; // Prompt for file name
-		std::string extension = ".png"; // Capture type
-
+		bool bRecording = false; // Recording status
 
 		// These are all for restoring from full screen
 		RECT windowRect{}; // Window rectangle
@@ -88,6 +78,10 @@ class ofApp : public ofBaseApp{
 		DWORD g_dwStyle = 0; // Original style
 		char g_Initfile[MAX_PATH]={0};
 
+		// SpoutRecorder
+		char g_RecorderName[MAX_PATH]={ 0 };
+		uint64_t StartTime = 0;
+		float ElapsedTime = 0.0f;
 		
 		void appMenuFunction(string title, bool bChecked);
 		void doFullScreen(bool bEnable, bool PreviewMode);
