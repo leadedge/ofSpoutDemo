@@ -10,29 +10,32 @@ The latest [Release](https://github.com/leadedge/ofSpoutDemo/releases) contains 
 ## Receiver
 
 ### File menu
-File > Save - saves images of the required type (jpg, png, bmp etc) to the bin>data.
+* Save image\
+Saves images of the required name and type (jpg, png, bmp etc). Images are saved in bin\data\captures.
 
-### Capture menu
-* Capture type\
-Image type for "F12" snapshot can be selected as either "tif" or "png".
-* Capture image\
-Select this menu option or the "F12" key to capture an image. Using the "F12" key avoids freeze of the sender stream by the menu selection.
-* Open capture folder\
-Opens file explorer to show captured images. Images are saved in bin>data>captures. 
-
-### Record menu
-* Record system audio\
-Audio from the system audio device (speakers) is recorded along with the video using a virtual audio device developed by [Roger Pack](https://github.com/rdp/virtual-audio-capture-grabber-device). The audio filters must be registered. Refer to the "bin>data>audio folder for details.
-* RGB video data\
-Pixel data is RBGA by defult. This provides maximum epeed for capture from video memory. This option can be selected if RGB pixel type is required for compatibility with other software.
-* Prompt for file name\
-Videos are normally saved using the sender name to bin>data>videos. Select this option if another destination or video file name is required.
-* Start recording\
-Select this menu option or the "F9" key to start recording. Using the "F9" key avoids interrupting the video by the menu selection.
-* Stop recording\
-Similarly this option ends recording and the "F10" key prevents the menu interrupting the video.
+### View menu
+* Open capture folder
 * Open video folder\
-Opens file explorer to show recorded videos.
+Opens file explorer to show captured images and recorder videos. Videos are saved in bin\data\videos.
+
+### Help > Options
+Opens a dialog with capture and recording options.
+
+Capture
+* Image type - png or tif\
+Tif images can be produced instead of default png if required and may be useful if the sender is producing 16 bit texture format. The format is shown by the on-screen display or further details are in the "SpoutPanel" sender selection dialog.
+
+Recording
+* Codec - mpeg4 or x264\
+x264 codec can be used instead of default Mpeg4. Compatibility and quality may be improved, although the encoding speed may be reduced slightly. To check, click on the SpoutRecoder taskbar icon while recording. FFmpeg encoding speed is shown in the console window. You should see a speed of 1.0 if the encoding is keeping pace with the input frame rate. Minimize the recorder console when done.
+* Pixel format - RGB or RGBA\
+Pixel data is RBGA by default. This provides maximum epeed for capture from video memory. This option can be selected if RGB pixel type is required for compatibility with other software.
+* Audio - record with system audio\
+Audio from the system audio device (speakers) is recorded along with the video using a [virtual audio device](https://github.com/rdp/virtual-audio-capture-grabber-device) developed by Roger Pack. The audio filters must be registered. Refer to the "bin\data\audio" folder for details.
+* File name - prompt for video file name\
+Videos are normally saved using the sender name to bin>data>videos and over-written if the file exists. Select this option if another destination or video file name is required.\
+* HELP button\
+Shows details of the options.
 
 ### Window menu
 * Show on top\
