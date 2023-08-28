@@ -10,12 +10,14 @@
 #define IDD_ABOUTBOX                            500
 #define IDD_NAMEBOX                             501
 #define IDD_OPTIONSBOX                          503
+#define IDC_RECORD                              40000
 #define IDC_PNG                                 40001
 #define IDC_TIF                                 40002
 #define IDC_MPEG4                               40003
 #define IDC_X264                                40004
-#define IDC_RGBA                                40005
-#define IDC_RGB                                 40006
 #define IDC_AUDIO                               40007
 #define IDC_PROMPT                              40008
 #define IDC_OPTIONS_HELP                        40009
+#define IDC_DURATION                            40010
+#define IDC_SECONDS                             40011
+#define IDC_OPTIONS_RESET                       40012

@@ -84,6 +84,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <CodeAnalysisRuleSet>NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -141,7 +142,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>src\Nvapi\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
@@ -164,7 +165,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>src\Nvapi\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
@@ -178,6 +179,7 @@
     <ClCompile Include="..\SpoutReceiver.cpp" />
     <ClCompile Include="..\SpoutSender.cpp" />
     <ClCompile Include="..\SpoutSenderNames.cpp" />
+    <ClCompile Include="..\SpoutShaders.cpp" />
     <ClCompile Include="..\SpoutSharedMemory.cpp" />
     <ClCompile Include="..\SpoutUtils.cpp" />
     <ClCompile Include="src\Addons\ofxSkybox\ofxCubeMap.cpp" />
@@ -185,6 +187,7 @@
     <ClCompile Include="src\Addons\ofxWinMenu\ofxWinMenu.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\ofApp.cpp" />
+    <ClCompile Include="src\SpoutRecord.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Spout.h" />
@@ -197,6 +200,7 @@
     <ClInclude Include="..\SpoutReceiver.h" />
     <ClInclude Include="..\SpoutSender.h" />
     <ClInclude Include="..\SpoutSenderNames.h" />
+    <ClInclude Include="..\SpoutShaders.h" />
     <ClInclude Include="..\SpoutSharedMemory.h" />
     <ClInclude Include="..\SpoutUtils.h" />
     <ClInclude Include="src\Addons\ofxSkybox\ofxCubeMap.h" />
@@ -204,6 +208,7 @@
     <ClInclude Include="src\Addons\ofxWinMenu\ofxWinMenu.h" />
     <ClInclude Include="src\ofApp.h" />
     <ClInclude Include="src\resource.h" />
+    <ClInclude Include="src\SpoutRecord.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\libs\openFrameworksCompiled\project\vs\openframeworksLib.vcxproj">

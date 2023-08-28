@@ -56,6 +56,14 @@
 	14.08.23 - Replace capture and recording menu options Options dialog box
 			   Add View Menu for capture and recording folders
 			   Version 1.012
+	22.08.23 - Change from F9/F10 to F1/F2 due to WM_SYSCOMMAND message for F10
+	26.08.23 - Change from SpoutRecorder command line to SpoutRecord class
+			   Remove rgb option. No benefit after testing.
+			   Remove View menu and add to Window menu
+			   Remove "Video folder" item if disabled
+			   Add recording time display
+			   Version 1.013
+
     =========================================================================
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -82,12 +90,26 @@ static INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, L
 static PSTR szText;
 static PSTR szCaption;
 
+#ifdef BUILDRECEIVER
 static INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam); // enter a sender name 
+static char g_ExePath[MAX_PATH]={0}; // Executable path
 static std::string extension = ".png"; // Capture type
+static bool bEnableRecording = false;
 static int codec = 0; // mpg4 / x264
-static bool bRgb = false; // rgb/rgba
 static bool bAudio = false; // system audio
 static bool bPrompt = false; // file name prompt
+static bool bDuration = false; // Record for fixed duration
+static long SecondsDuration = 0L; // Time to record
+// For cancel
+static std::string old_extension = extension;
+static bool old_bEnableRecording = bEnableRecording;
+static int  old_codec = codec;
+static bool old_bAudio = bAudio;
+static bool old_bPrompt = bPrompt;
+static bool old_bDuration = bDuration;
+static long old_SecondsDuration = SecondsDuration;
+#endif
+
 
 static INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 static int spoutVersion = 0;
@@ -151,11 +173,8 @@ void ofApp::setup(){
 	// "File" popup menu
 	//
 	HMENU hPopup = menu->AddPopupMenu(g_hMenu, "File");
-	menu->AddPopupItem(hPopup, "Save image", false, false);
 #ifdef BUILDRECEIVER
-	HMENU hView = menu->AddPopupMenu(g_hMenu, "View");
-	menu->AddPopupItem(hView, "Capture folder", false, false); // Not checked and not auto-check
-	menu->AddPopupItem(hView, "Video folder", false, false);
+	menu->AddPopupItem(hPopup, "Save image", false, false);
 #else
 	menu->AddPopupItem(hPopup, "Sender name", false, false);
 	menu->AddPopupSeparator(hPopup);
@@ -169,14 +188,19 @@ void ofApp::setup(){
 	hPopup = menu->AddPopupMenu(g_hMenu, "Window");
 	bTopmost = false;
 	menu->AddPopupItem(hPopup, "Show on top"); // Unchecked, auto check
+	bShowInfo = true;
 #ifdef BUILDRECEIVER
 	bPreview = false;
 	menu->AddPopupItem(hPopup, "Preview", false, false); // Unchecked, no auto-check
 	bFullScreen = false;
 	menu->AddPopupItem(hPopup, "Full screen", false, false); // Unchecked, no auto-check
-#endif
-	bShowInfo = true;
 	menu->AddPopupItem(hPopup, "Show info", true); // Checked, auto-check
+	menu->AddPopupSeparator(hPopup);
+	menu->AddPopupItem(hPopup, "Capture folder", false, false); // Not checked and not auto-check
+	// "Video folder" item is added by ReadInitFile and removed/added after Options dialog
+#else
+	menu->AddPopupItem(hPopup, "Show info", true); // Checked, auto-check
+#endif
 
 	//
 	// "Help" popup
@@ -225,20 +249,26 @@ void ofApp::setup(){
 	// It is re-allocated later to match the size and format of the sender.
 	myTexture.allocate(senderWidth, senderHeight, glFormat);
 
-	// SpoutDemo.ini file path
-	GetModuleFileNameA(NULL, g_Initfile, MAX_PATH);
-	PathRemoveFileSpecA(g_Initfile);
-	strcat_s(g_Initfile, MAX_PATH, "\\SpoutDemo.ini");
+	// Executable path
+	GetModuleFileNameA(NULL, g_ExePath, MAX_PATH);
+	PathRemoveFileSpecA(g_ExePath);
+
+	// FFmpeg path
+	g_FFmpegPath = g_ExePath;
+	g_FFmpegPath +="\\DATA\\FFMPEG\\ffmpeg.exe";
+
+	// Does FFmpeg.exe exist ?
+	if (_access(g_FFmpegPath.c_str(), 0) == -1) {
+		g_FFmpegPath.clear(); // disable functions using FFmpeg
+	}
+
+	// SpoutReceiver.ini file path
+	strcpy_s(g_Initfile, MAX_PATH, g_ExePath);
+	strcat_s(g_Initfile, MAX_PATH, "\\Spout Receiver.ini");
+
 	// Read menu settings
 	ReadInitFile(g_Initfile);
 
-	// SpoutRecorder program path
-	if (GetModuleFileNameA(GetCurrentModule(), g_RecorderName, MAX_PATH) > 0) {
-		PathRemoveFileSpecA(g_RecorderName);
-		strcat_s(g_RecorderName, MAX_PATH, "\\SpoutRecorder.exe");
-		if (_access(g_RecorderName, 0) == -1) // Does SpoutRecorder.exe exist ?
-			g_RecorderName[0]=0; // Disable name for recording functions
-	}
 
 #else
 	// ---------------------------------------------------------------------------
@@ -340,20 +370,32 @@ void ofApp::draw() {
 			glFormat = receiver.GLDXformat();
 			myTexture.allocate(receiver.GetSenderWidth(), receiver.GetSenderHeight(), glFormat);
 
-			// Has the sender changed ?
+			// Has the sender name changed ?
 			if (strcmp(receiver.GetSenderName(), senderName) != 0) {
-				// Stop and close recorder
-				if (bRecording) {
-					appMenuFunction("Stop recording", false);
-				}
-				else {
-					// If SpoutRecoder is open and not recording
-					// Send a "sender" command to change to the active sender
-					HWND hRecord = FindWindowA(NULL, "SpoutRecorder");
-					SetWindowTextA(hRecord, "sender");
+				// Stop recording
+				StopRecording();
+			}
+
+			// Has the sender size changed ?
+			if (senderWidth != receiver.GetSenderWidth() || senderHeight != receiver.GetSenderHeight()) {
+				StopRecording();
+			}
+
+			strcpy_s(senderName, 256, receiver.GetSenderName());
+			senderWidth = receiver.GetSenderWidth();
+			senderHeight = receiver.GetSenderHeight();
+
+		}
+
+		if (bRecording) {
+			recorder.Write(myTexture.getTextureData().textureID, myTexture.getTextureData().textureTarget, senderWidth, senderHeight);
+			ElapsedRecordingTime = (ElapsedMicroseconds()-StartRecordingTime)/1000000.0; // seconds
+			// Check for fixed duration
+			if (bDuration) {
+				if (ElapsedRecordingTime > (double)SecondsDuration) {
+					StopRecording();
 				}
 			}
-			strcpy_s(senderName, 256, receiver.GetSenderName());
 		}
 	}
 
@@ -376,7 +418,7 @@ void ofApp::draw() {
 			// Frame counting can also be disabled in SpoutSettings
 			str.clear();
 			if (receiver.GetSenderFrame() > 0) {
-				str += "fps ";
+				str = "fps ";
 				str += ofToString((int)roundf(receiver.GetSenderFps()));
 				str += " frame  ";
 				str += ofToString(receiver.GetSenderFrame());
@@ -400,31 +442,38 @@ void ofApp::draw() {
 			myFont.drawString(str, 20, 52);
 
 			// Show action keys
-			str = "F9 - start recording : F10 - stop recording : F12 - capture image";
-			myFont.drawString(str, 50, ofGetHeight() - 40);
+			if (bEnableRecording) {
+				if (!bRecording) {
+					str = "F1 - start recording : F12 - capture";
+					myFont.drawString(str, 170, ofGetHeight() - 36);
+				}
+				else {
+					str = "F2 - stop recording";
+					myFont.drawString(str, 170, ofGetHeight() - 36);
+				}
+			}
+			else {
+				str = "F12 - capture";
+				myFont.drawString(str, 244, ofGetHeight() - 36);
+			}
 
 			// Show keyboard shortcuts
 			str = "RH click - select sender : f - fullscreen : p - preview : Space - hide info";
-			myFont.drawString(str, 40, ofGetHeight() - 18);
+			myFont.drawString(str, 40, ofGetHeight() - 14);
 
-			// Show video recording status
+			// Show recording status
 			if (bRecording) {
+				ofSetColor(255, 255, 0);
+				// Format as hh:mm:ss
+				int total = (int)ElapsedRecordingTime;
+				int hrs   = total/3600;
+				int mins  = (total % 3600)/60;
+				int secs  = (total % 60);
+				int tick  = (int)((ElapsedRecordingTime-(double)total)*10.0);
 				char tmp[256]={};
-				// Check if SpoutRecorder was closed externally (Approx 0.1msec)
-				// Render time for this application does not affect SpoutRecorder
-				if(FindWindowA(NULL, "Recording")) {
-					// Recording
-					ofSetColor(255, 255, 0);
-					ElapsedTime = (float)(ofGetElapsedTimeMillis()-StartTime)/1000.0;
-					sprintf_s(tmp, 256, "Recording (%.2f)", (float)ElapsedTime);
-					str = tmp;
-					myFont.drawString(str, ofGetWidth()-200, 30);
-				}
-				else {
-					// Closed
-					bRecording = false;
-					StartTime=0;
-				}
+				sprintf_s(tmp, 256, "(%2.2d:%2.2d:%2.2d.%.1d)", hrs, mins, secs, tick);
+				myFont.drawString(tmp, ofGetWidth()-300, ofGetHeight()-36);
+				ofSetColor(255, 255, 255);
 			}
 		}
 		else {
@@ -535,7 +584,7 @@ void ofApp::exit() {
 	// Save recording and capture settings
 	WriteInitFile(g_Initfile);
 	// Stop recording
-	appMenuFunction("Stop recording", false);
+	StopRecording();
 #else
 	sender.ReleaseSender();
 #endif
@@ -558,7 +607,7 @@ void ofApp::mousePressed(int x, int y, int button) {
 			receiver.SelectSender();
 		}
 		else {
-			SpoutMessageBox(NULL, "No sender selection while recording", "Select sender", MB_OK | MB_ICONWARNING, 2000);
+			SpoutMessageBox(NULL, "No sender selection while recording", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2000);
 		}
 	}
 #else
@@ -606,12 +655,14 @@ void ofApp::keyPressed(int key) {
 
 	if (receiver.IsConnected() && !bFullScreen) {
 
-		// Recording - F9 / F10 keys
-		if (key == OF_KEY_F9)
-			appMenuFunction("Start recording", false);
-		if (key == OF_KEY_F10)
-			appMenuFunction("Stop recording", false);
+		// Recording - F1 / F2 keys
+		if (key == OF_KEY_F1) {
+			StartRecording();
+		}
 
+		if (key == OF_KEY_F2) {
+			StopRecording();
+		}
 		// Snapshot - F12 key
 		if (key == OF_KEY_F12) {
 			appMenuFunction("Capture image", false);
@@ -681,7 +732,7 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 			}
 		}
 		else {
-			SpoutMessageBox(NULL, "No sender", "Message", MB_OK, 1400);
+			SpoutMessageBox(NULL, "No sender", "Spout Receiver", MB_OK | MB_TOPMOST, 1400);
 		}
 	}
 
@@ -730,96 +781,13 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 				myImage.save(savepath); // save png or tif
 			}
 			else {
-				SpoutMessageBox(NULL, "Unsupported format", "Spout Receiver", MB_OK | MB_ICONWARNING, 2000);
+				SpoutMessageBox(NULL, "Unsupported format", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2000);
 				return;
 			}
-			SpoutMessageBox(NULL, imagename.c_str(), "Saved image", MB_OK, 2000); // 2 second timeout
+			SpoutMessageBox(NULL, imagename.c_str(), "Saved image", MB_OK | MB_TOPMOST, 2000); // 2 second timeout
 		}
 		else {
-			SpoutMessageBox(NULL, "No sender\nImage capture not possible", "Spout Receiver", MB_OK | MB_ICONWARNING, 2000);
-		}
-	}
-
-	// Recording start - F9
-	if (title == "Start recording") {
-		if (receiver.IsConnected()) {
-			if (g_RecorderName[0]) {
-
-				// SpoutRecorder is open, close it
-				HWND hRecorder = FindWindowA(NULL, "Recording"); // recording
-				if(!hRecorder) hRecorder = FindWindowA(NULL, "SpoutRecorder"); // open
-				if (hRecorder) {
-					SetWindowTextA(hRecorder, "-quit");
-					hRecorder = NULL;
-					bRecording = false;
-					StartTime = 0;
-				}
-
-				// Open SpoutRecorder with command line args to start recording
-				std::string str = "-start -hide";
-				if (bAudio)     str += " -audio"; // default none
-				if (bRgb)       str += " -rgb"; // default rgba
-				if (codec == 1) str += " -x264"; // default mpeg4
-				if (bPrompt)    str += " -prompt"; // default none
-				// printf("%s\n", str.c_str());
-				ShellExecuteA(ofGetWin32Window(), "open", g_RecorderName, str.c_str(), NULL, SW_SHOWNORMAL);
-				// Wait till the caption shows "Recording"
-				do {hRecorder = FindWindowA(NULL, "Recording");} while (!hRecorder);
-				bRecording = true;
-				Sleep(10); // Slight delay required to allow the icon to start flashing
-				StartTime = ofGetElapsedTimeMillis();
-			}
-			else {
-				SpoutMessageBox(NULL, "SpoutRecorder not found", "File not found", MB_OK | MB_ICONWARNING);
-			}
-		}
-	}
-
-	// Recording stop - F10
-	if (title == "Stop recording") {
-		HWND hRecorder = FindWindowA(NULL, "Recording");
-		if (hRecorder) {
-
-			// If recording, send a caption command to stop and quit
-			if (bRecording) {
-				SetWindowTextA(hRecorder, "-quit");
-				hRecorder = NULL;
-				bRecording = false;
-				StartTime = 0;
-
-				//
-				// Show a messagebox with video file details
-				//
-
-				// Video file name
-				std::string msgstr;
-				msgstr = senderName;
-				if (codec == 0)
-					msgstr += ".mp4 ";
-				else
-					msgstr += ".mkv ";
-
-				// Duration
-				char tmp[MAX_PATH]={};
-				sprintf_s(tmp, MAX_PATH, " (%.2f seconds)\n\n", (float)ElapsedTime);
-				msgstr += tmp;
-
-				// Settings
-				if (codec == 0)
-					msgstr += "mpeg4 codec, ";
-				else
-					msgstr += "x264 codec, ";
-				if (bRgb == 1)
-					msgstr += "RGB pixel format, ";
-				else
-					msgstr += "RGBA pixel format, ";
-				if (bAudio)
-					msgstr += "system audio";
-				else
-					msgstr += "no audio\n";
-
-				SpoutMessageBox(NULL, msgstr.c_str(), "Saved video file", MB_OK | MB_ICONWARNING, 2500);
-			}
+			SpoutMessageBox(NULL, "No sender\nImage capture not possible", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2000);
 		}
 	}
 
@@ -846,7 +814,9 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 #endif
 
 	if (title == "Exit") {
-		appMenuFunction("Stop recording", false);
+#ifdef BUILDRECEIVER
+		StopRecording();
+#endif
 		ofExit(); // Quit the application
 	}
 
@@ -905,9 +875,29 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	//
 	// Help menu
 	//
+#ifdef BUILDRECEIVER
 	if (title == "Options") {
+
+		old_codec = codec;
+		old_bAudio = bAudio;
+		old_bPrompt = bPrompt;
+		old_bDuration = bDuration;
+		old_SecondsDuration = SecondsDuration;
+		old_bEnableRecording = bEnableRecording;
+		old_extension = extension;
+
 		DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_OPTIONSBOX), g_hWnd, Options);
+
+		// Has the user changed enable recording ?
+		if (bEnableRecording != old_bEnableRecording) {
+			HMENU hSubMenu = GetSubMenu(g_hMenu, 1); // Window sub-menu
+			if (!bEnableRecording)
+				RemoveMenu(hSubMenu, 6, MF_BYPOSITION);
+			else
+				menu->AddPopupItem(hSubMenu, "Video folder", false, false);
+		}
 	}
+#endif
 
 	if (title == "About") {
 		DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_ABOUTBOX), g_hWnd, About);
@@ -1049,37 +1039,165 @@ void ofApp::doFullScreen(bool bEnable, bool bPreviewMode)
 
 }
 
+#ifdef BUILDRECEIVER
+// Recording start - F1
+bool ofApp::StartRecording()
+{
+	// Return if not receiving, recording is disabled, already recording, preview or full screen
+	if (!receiver.IsConnected() || !bEnableRecording || bRecording || bPreview || bFullScreen)
+		return false;
+
+	if (bPrompt) {
+		std::string str = EnterVideoName();
+		if (str.empty())
+			return false;
+		g_OutputFile = str;
+	}
+	else {
+		// Default output file
+		g_OutputFile = g_ExePath; // exe folder
+		g_OutputFile += "\\data\\videos\\";
+		g_OutputFile += (char*)senderName;
+		if (codec == 1)
+			g_OutputFile += ".mp4";
+		else
+			g_OutputFile += ".mkv";
+	}
+
+	// Options for audio, codec and fps
+	recorder.EnableAudio(bAudio); // For recording system audio
+	recorder.SetCodec(codec); // 0-mpeg4, 1-x264 codec
+	recorder.SetFps(30); // Fps for FFmpeg (see HoldFps)
+
+	if (recorder.Start(g_FFmpegPath, g_OutputFile, receiver.GetSenderWidth(), receiver.GetSenderHeight(), true)) { // RGBA pixel format
+		bRecording = true;
+		StartRecordingTime = ElapsedMicroseconds();
+		return true;
+	}
+	else {
+		SpoutMessageBox(NULL, "FFmpeg not found", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST);
+	}
+
+	return false;
+}
+
+
+// Recording stop - F2
+void ofApp::StopRecording()
+{
+	if (bRecording) {
+
+		recorder.Stop();
+
+		// Show a messagebox with video file details
+		if (bPrompt) {
+
+			// Video file name without full path
+			char filename[MAX_PATH]={};
+			strcpy_s(filename, MAX_PATH, g_OutputFile.c_str());
+			PathStripPathA(filename);
+			std::string msgstr = filename;
+
+			// Duration
+			char tmp[MAX_PATH]={};
+			sprintf_s(tmp, MAX_PATH, " (%.2f seconds)\n\n", (float)ElapsedRecordingTime);
+			msgstr += tmp;
+
+			// Settings
+			if (codec == 0)
+				msgstr += "mpeg4 codec, ";
+			else
+				msgstr += "x264 codec, ";
+			if (bAudio)
+				msgstr += "system audio";
+			else
+				msgstr += "no audio\n";
+			SpoutMessageBox(NULL, msgstr.c_str(), "Saved video file", MB_OK | MB_TOPMOST, 2000);
+		}
+	}
+
+	bRecording = false;
+	StartRecordingTime = 0.0;
+
+}
+
+//
+// User file name entry
+//
+std::string ofApp::EnterVideoName()
+{
+	char filePath[MAX_PATH]={0};
+	sprintf_s(filePath, MAX_PATH, g_OutputFile.c_str());
+
+	OPENFILENAMEA ofn={};
+	ofn.lStructSize = sizeof(OPENFILENAMEA);
+	HWND hwnd = NULL;
+	ofn.hwndOwner = hwnd;
+	ofn.hInstance = GetModuleHandle(0);
+	ofn.nMaxFileTitle = 31;
+	// if ofn.lpstrFile contains a path, that path is the initial directory.
+	ofn.lpstrFile = (LPSTR)filePath;
+	ofn.nMaxFile = MAX_PATH;
+	if (codec == 1)
+		ofn.lpstrFilter = "Matroska (*.mkv)\0*.mkv\0Mpeg-4 (*.mp4)\0*.mp4\0Audio Video Interleave (*.avi)\0*.avi\0Quicktime (*.mov)\0*.mov\0All files (*.*)\0*.*\0";
+	else
+		ofn.lpstrFilter = "Mpeg-4 (*.mp4)\0*.mp4\0Matroska (*.mkv)\0*.mkv\0Audio Video Interleave (*.avi)\0*.avi\0Quicktime (*.mov)\0*.mov\0All files (*.*)\0*.*\0";
+	ofn.lpstrDefExt = "";
+	// OFN_OVERWRITEPROMPT prompts for over-write
+	ofn.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
+	ofn.lpstrTitle = "Output File";
+	if (!GetSaveFileNameA(&ofn)) {
+		// FFmpeg has not been started yet, return to try again
+		return "";
+	}
+	// User file name entry
+	return filePath;
+}
+
+
 //--------------------------------------------------------------
 // Save a configuration file in the executable folder
 // Ini file is created if it does not exist
 void ofApp::WriteInitFile(const char* initfile)
 {
+	char tmp[MAX_PATH]={0};
 
+	// Capture options
 	if (extension == ".tif")
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".tif", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".png", (LPCSTR)initfile);
 	
+	// Recording options
 	if (bAudio)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"1", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"0", (LPCSTR)initfile);
 
-	if (bRgb)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"RGB", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"RGB", (LPCSTR)"0", (LPCSTR)initfile);
-	
 	if (codec == 1)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"1", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"0", (LPCSTR)initfile);
+
+	if (bEnableRecording)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Record", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Record", (LPCSTR)"0", (LPCSTR)initfile);
 
 	if (bPrompt)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"1", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"0", (LPCSTR)initfile);
 
+	if (bDuration)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Duration", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Duration", (LPCSTR)"0", (LPCSTR)initfile);
+
+	sprintf_s(tmp, MAX_PATH, "%8ld", SecondsDuration);
+	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Seconds", (LPCSTR)tmp, (LPCSTR)initfile);
+
+	// Menu options
 	if (bShowInfo)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Info", (LPCSTR)"1", (LPCSTR)initfile);
 	else
@@ -1092,24 +1210,32 @@ void ofApp::WriteInitFile(const char* initfile)
 
 }
 
+
 //--------------------------------------------------------------
 // Read back settings from configuration file
 void ofApp::ReadInitFile(const char* initfile)
 {
 	char tmp[MAX_PATH]={0};
 
-	// Capture/Recording options
-	extension = ".png"; bAudio = false; bRgb = false; codec = 0; bPrompt = 0;
+	// Capture options
+	extension = ".png"; bAudio = false; codec = 0; bPrompt = 0;
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Imagetype", NULL, (LPSTR)tmp, 5, initfile);
 	if (tmp[0]) extension = tmp;
+	
+	// Recording options
+	bAudio = false; codec = 0; bPrompt = false; bDuration=false; SecondsDuration=0L; bEnableRecording = false;
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Codec", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) codec = atoi(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"RGB", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bRgb = (atoi(tmp) == 1);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Audio", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) bAudio = (atoi(tmp) == 1);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Prompt", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) bPrompt = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Duration", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bDuration = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Seconds", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) SecondsDuration = atol(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Record", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bEnableRecording = (atoi(tmp) == 1);
 
 	// Menu options
 	bShowInfo = true; bTopmost = false;
@@ -1132,10 +1258,16 @@ void ofApp::ReadInitFile(const char* initfile)
 	else
 		menu->SetPopupItem("Show info", false);
 
+	if (bEnableRecording) {
+		HMENU hSubMenu = GetSubMenu(g_hMenu, 1); // Window sub-menu
+		menu->AddPopupItem(hSubMenu, "Video folder", false, false);
+	}
+
 	// Set topmost or not
 	appMenuFunction("Show on top", bTopmost);
 
 }
+#endif
 
 bool ofApp::EnterSenderName(char *SenderName, char *caption)
 {
@@ -1200,28 +1332,35 @@ INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 	return (INT_PTR)FALSE;
 }
 
-
+#ifdef BUILDRECEIVER
 // Message handler for options
 INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
+	char tmp[256]={};
 
 	switch (message) {
 
 	case WM_INITDIALOG:
 		{
-			int iPos = 0;
 			// Capture type - png/tif
+			int iPos = 0;
 			if (extension == ".tif") iPos = 1; // 0-png, 1-tif
 			CheckRadioButton(hDlg, IDC_PNG, IDC_TIF, IDC_PNG+iPos);
-			// Codec - 0-mpeg4, 1-x264
-			CheckRadioButton(hDlg, IDC_MPEG4, IDC_X264, IDC_MPEG4+(int)codec);
-			// Pixel format - 0-rgba, 1, rgb
-			CheckRadioButton(hDlg, IDC_RGBA, IDC_RGB, IDC_RGBA+(int)bRgb);
-			// System audio
-			CheckDlgButton(hDlg, IDC_AUDIO, (UINT)bAudio);
+
+			// Enable recording
+			CheckDlgButton(hDlg, IDC_RECORD, (UINT)bEnableRecording);
 			// File name prompt
 			CheckDlgButton(hDlg, IDC_PROMPT, (UINT)bPrompt);
+			// Record for duration
+			CheckDlgButton(hDlg, IDC_DURATION, (UINT)bDuration);
+			// Codec - 0-mpeg4, 1-x264
+			CheckRadioButton(hDlg, IDC_MPEG4, IDC_X264, IDC_MPEG4+(int)codec);
+			// System audio
+			CheckDlgButton(hDlg, IDC_AUDIO, (UINT)bAudio);
+			// SecondsDuration
+			sprintf_s(tmp, "%ld", SecondsDuration);
+			SetDlgItemTextA(hDlg, IDC_SECONDS, (LPCSTR)tmp);
 		}
 		return (INT_PTR)TRUE;
 
@@ -1231,52 +1370,76 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		case IDC_OPTIONS_HELP:
 			{
 				std::string str = "Image type\n";
-				str += "Tif images can be produced instead of default png ";
-				str += "if required and may be useful if the sender is producing 16 bit texture format. ";
-				str += "The format is shown by the on-screen display or details in the \"SpoutPanel\" sender selection dialog.\n\n";
-				str += "Codec\nx264 codec can be used instead of default Mpeg4. ";
-				str += "Compatibility and quality may be improved, although the encoding speed may be reduced slightly. ";
-				str += "To check, click on the SpoutRecoder taskbar icon while recording. ";
-				str += "FFmpeg encoding speed is shown in the console window. ";
-				str += "You should see a speed of 1.0 if the encoding is keeping pace with the input frame rate. ";
-				str += "Minimize the recorder console when done.\n\n";
-				str += "Pixel format\nUse RGB pixel format instead of the default RGBA. ";
-				str += "This may be necessary for compatibility, although RGBA format allows faster, optimized data copy ";
-				str += "from the Spout sender texture.\n\n";
+				str += "Tif images, instead of default png, ";
+				str += "may be useful if the sender is producing 16 bit textures. ";
+				str += "The texture format is shown by the on-screen display or more details in the \"SpoutPanel\" sender selection dialog.\n\n";
+				str += "Enable\n";
+				str += "Enable or disable recording.\n\n";
+				str += "File name\nPrompt for file name and show file details after save. By default, a file with the sender name is saved in \"data\\videos\" and over-written if it exists.\n\n";
+				str += "Duration\nRecord for a fixed amount of time.\n";
+				str += "Seconds\nTime to record in seconds.\n\n";
+				str += "Codec\n";
+				str += "x264 codec can be used instead of default Mpeg4. ";
+				str += "Playback compatibility and quality may be improved. File size approximately 20% less.\n\n";
 				str += "Audio\nRecord system audio with the video, ";
-				str += "a <a href=\"https://github.com/rdp/virtual-audio-capture-grabber-device/\">virtual audio device</a> ";
-				str += "developed by Roger Pack is used. The device is a DirectShow filter and is be used with FFmpeg to record the audio. ";
-				str += "Register it using \"VirtualAudioRegister.exe\" in the \"AUDIO\" folder.\n\n";
-				str += "File name\nPrompt for file name. By default, a file with the sender name is saved in \"DATA\\Videos\" and over-written if it exists.\n";
-				SpoutMessageBox(NULL, str.c_str(), "Options", MB_OK);
+				str += "A DirectShow <a href=\"https://github.com/rdp/virtual-audio-capture-grabber-device/\">virtual audio device</a>, ";
+				str += "developed by Roger Pack, allows FFmpeg to record system audio together with the video. ";
+				str += "Register it using \"VirtualAudioRegister.exe\" in the <a href=\"";
+				str += g_ExePath;
+				str += "\\data\\audio\\VirtualAudio\">\"VirtualAudio\"</a> folder.\n\n";
+				SpoutMessageBox(NULL, str.c_str(), "Options", MB_OK | MB_TOPMOST);
 			}
 			break;
 
+		case IDC_OPTIONS_RESET:
+		{
+			extension = ".png";
+			codec = 0;
+			bAudio = false;
+			bPrompt = false;
+			bDuration = false;
+			SecondsDuration = 0L;
+			bEnableRecording = false;
+			SendMessage(hDlg, WM_INITDIALOG, 0, 0L);
+		}
+		break;
 
 		case IDOK:
 			extension = ".png";
 			codec = 0;
-			bRgb = false;
 			bAudio = false;
 			bPrompt = false;
+			bDuration = false;
+			SecondsDuration = 0L;
+			bEnableRecording = false;
 			if (IsDlgButtonChecked(hDlg, IDC_TIF) == BST_CHECKED)
 				extension = ".tif";
-			if (IsDlgButtonChecked(hDlg, IDC_X264) == BST_CHECKED)
-				codec = 1;
-			if (IsDlgButtonChecked(hDlg, IDC_RGB) == BST_CHECKED)
-				bRgb = true;
-			if (IsDlgButtonChecked(hDlg, IDC_AUDIO) == BST_CHECKED)
-				bAudio = true;
+			if (IsDlgButtonChecked(hDlg, IDC_RECORD) == BST_CHECKED)
+				bEnableRecording = true;
 			if (IsDlgButtonChecked(hDlg, IDC_PROMPT) == BST_CHECKED)
 				bPrompt = true;
-
+			if (IsDlgButtonChecked(hDlg, IDC_DURATION) == BST_CHECKED)
+				bDuration = true;
+			if (IsDlgButtonChecked(hDlg, IDC_X264) == BST_CHECKED)
+				codec = 1;
+			if (IsDlgButtonChecked(hDlg, IDC_AUDIO) == BST_CHECKED)
+				bAudio = true;
+			GetDlgItemTextA(hDlg, IDC_SECONDS, (LPSTR)tmp, 256);
+			SecondsDuration = atol(tmp);
 			EndDialog(hDlg, 1);
 			break;
 
 		case IDCANCEL:
-			// User pressed cancel.  Just take down dialog box.
+			codec = old_codec;
+			bAudio = old_bAudio;
+			bPrompt = old_bPrompt;
+			bDuration = old_bDuration;
+			SecondsDuration = old_SecondsDuration;
+			bEnableRecording = old_bEnableRecording;
+			extension = old_extension;
 			EndDialog(hDlg, 0);
 			return (INT_PTR)TRUE;
+
 		default:
 			return (INT_PTR)FALSE;
 		}
@@ -1285,6 +1448,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	return (INT_PTR)FALSE;
 }
+#endif
 
 
 // Message handler for About box

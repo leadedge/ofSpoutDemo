@@ -25,6 +25,9 @@
 
 #include "ofMain.h"
 #include "resource.h"
+#include "SpoutRecord.h"
+#include "commdlg.h"
+
 #include "Addons\ofxSkybox\ofxSkyBox.h" // Skybox addon
 #include "Addons\ofxWinMenu\ofxWinMenu.h" // Windows menu addon
 #include "..\apps\SpoutGL\Spout.h" // Common for receiver and sender
@@ -64,7 +67,6 @@ class ofApp : public ofBaseApp{
 		bool bFullScreen = false;
 		bool bPreview = false;
 		bool bShowInfo = true;
-		bool bRecording = false; // Recording status
 
 		// These are all for restoring from full screen
 		RECT windowRect{}; // Window rectangle
@@ -76,17 +78,27 @@ class ofApp : public ofBaseApp{
 		HWND g_hwndTopmost = NULL; // topmost window before setting full screen
 		HMENU g_hMenu = NULL; // Original menu
 		DWORD g_dwStyle = 0; // Original style
-		char g_Initfile[MAX_PATH]={0};
 
-		// SpoutRecorder
-		char g_RecorderName[MAX_PATH]={ 0 };
-		uint64_t StartTime = 0;
-		float ElapsedTime = 0.0f;
-		
 		void appMenuFunction(string title, bool bChecked);
 		void doFullScreen(bool bEnable, bool PreviewMode);
+
+#ifdef BUILDRECEIVER
+		// Recording
+		spoutRecord recorder;
+		char g_Initfile[MAX_PATH]={0};
+		std::string g_FFmpegPath;
+		std::string g_FFmpegCodec;
+		std::string g_OutputFile;
+		bool bRecording = false; // Recording status
+		double StartRecordingTime = 0;
+		double ElapsedRecordingTime = 0.0f;
+		bool StartRecording();
+		void StopRecording();
+		std::string EnterVideoName();
 		void WriteInitFile(const char* initfile);
 		void ReadInitFile(const char* initfile);
+#endif
+
 		bool EnterSenderName(char *SenderName, char *caption);
 
 		ofTrueTypeFont myFont{};

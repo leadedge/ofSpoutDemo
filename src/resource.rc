@@ -8,6 +8,8 @@
 #include "resource.h"
 
 
+
+
 //
 // Dialog resources
 //
@@ -25,37 +27,6 @@ FONT 8, "Ms Shell Dlg"
 }
 
 
-LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
-IDD_OPTIONSBOX DIALOG 0, 0, 137, 146
-STYLE DS_3DLOOK | DS_CENTER | DS_MODALFRAME | DS_SHELLFONT | WS_CAPTION | WS_VISIBLE | WS_POPUP | WS_SYSMENU
-CAPTION "Options"
-FONT 8, "Ms Shell Dlg"
-{
-    GROUPBOX        "Capture", -1, 7,   5, 121, 30, 0, WS_EX_LEFT
-
-    LTEXT           "Image type", -1,   14, 18, 35, 9, SS_LEFT, WS_EX_LEFT
-    AUTORADIOBUTTON "png", IDC_PNG,     56, 18, 28, 8, 0, WS_EX_LEFT
-    AUTORADIOBUTTON "tif", IDC_TIF,     96, 18, 21, 8, 0, WS_EX_LEFT
-
-    GROUPBOX        "Recording", -1, 7, 40, 121, 77, 0, WS_EX_LEFT
-
-    LTEXT           "Codec", -1,        14, 55, 21, 9, SS_LEFT, WS_EX_LEFT
-    AUTORADIOBUTTON "Mpeg4", IDC_MPEG4, 56, 56, 37, 8, 0, WS_EX_LEFT
-    AUTORADIOBUTTON "x264", IDC_X264,   96, 56, 30, 8, 0, WS_EX_LEFT
-
-    LTEXT           "Pixel format", -1, 14, 71, 36, 9, SS_LEFT, WS_EX_LEFT
-    AUTORADIOBUTTON "RGBA", IDC_RGBA,   56, 72, 35, 8, 0, WS_EX_LEFT
-    AUTORADIOBUTTON "RGB", IDC_RGB,     96, 72, 31, 8, 0, WS_EX_LEFT
-
-    AUTOCHECKBOX    "Audio", IDC_AUDIO,      14, 86, 50, 8, BS_LEFTTEXT, WS_EX_LEFT
-    AUTOCHECKBOX    "File name", IDC_PROMPT, 14, 100, 50, 8, BS_LEFTTEXT, WS_EX_LEFT
-        
-    DEFPUSHBUTTON   "OK", IDOK,               13, 126, 35, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Cancel", IDCANCEL,       50, 126, 35, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Help", IDC_OPTIONS_HELP, 88, 126, 35, 14, 0, WS_EX_LEFT
-}
-
-
 
 LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 IDD_NAMEBOX DIALOG 0, 0, 186, 57
@@ -66,6 +37,37 @@ FONT 8, "Ms Shell Dlg"
     EDITTEXT        IDC_NAMETEXT, 10, 10, 166, 13, ES_AUTOHSCROLL, WS_EX_LEFT
     PUSHBUTTON      "Cancel", IDCANCEL, 98, 30, 50, 14, 0, WS_EX_LEFT
     DEFPUSHBUTTON   "OK", IDOK, 29, 30, 50, 14, 0, WS_EX_LEFT
+}
+
+
+
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+IDD_OPTIONSBOX DIALOG 0, 0, 137, 150
+STYLE DS_3DLOOK | DS_CENTER | DS_MODALFRAME | DS_SHELLFONT | WS_CAPTION | WS_VISIBLE | WS_POPUP | WS_SYSMENU
+CAPTION "Options"
+FONT 8, "Ms Shell Dlg"
+{
+    LTEXT           "Enable/disable", -1, 69, 53, 47, 9, SS_LEFT, WS_EX_LEFT
+    LTEXT           "File save dialog", -1, 69, 64, 49, 9, SS_LEFT, WS_EX_LEFT
+    LTEXT           "System audio", -1, 69, 101, 42, 9, SS_LEFT, WS_EX_LEFT
+    AUTOCHECKBOX    "Duration", IDC_DURATION, 14, 76, 50, 8, BS_LEFTTEXT, WS_EX_LEFT
+    EDITTEXT        IDC_SECONDS, 67, 75, 30, 12, ES_AUTOHSCROLL, WS_EX_LEFT
+    LTEXT           "seconds", -1, 100, 76, 27, 9, SS_LEFT, WS_EX_LEFT
+    AUTOCHECKBOX    "Enable", IDC_RECORD, 14, 53, 50, 8, BS_LEFTTEXT, WS_EX_LEFT
+    GROUPBOX        "Capture", -1, 7, 5, 122, 28, 0, WS_EX_LEFT
+    LTEXT           "Image type", -1, 14, 17, 35, 9, SS_LEFT, WS_EX_LEFT
+    AUTORADIOBUTTON "PNG", IDC_PNG, 56, 17, 26, 8, 0, WS_EX_LEFT
+    AUTORADIOBUTTON "TIF", IDC_TIF, 87, 17, 26, 8, 0, WS_EX_LEFT
+    GROUPBOX        "Recording", -1, 7, 40, 122, 77, 0, WS_EX_LEFT
+    LTEXT           "Codec", -1, 14, 89, 21, 9, SS_LEFT, WS_EX_LEFT
+    AUTORADIOBUTTON "  Mpeg4", IDC_MPEG4, 56, 89, 34, 8, 0, WS_EX_LEFT
+    AUTORADIOBUTTON " x264", IDC_X264, 95, 89, 31, 8, 0, WS_EX_LEFT
+    AUTOCHECKBOX    "Audio", IDC_AUDIO, 14, 101, 50, 8, BS_LEFTTEXT, WS_EX_LEFT
+    AUTOCHECKBOX    "File name", IDC_PROMPT, 14, 64, 50, 8, BS_LEFTTEXT, WS_EX_LEFT
+    DEFPUSHBUTTON   "OK", IDOK, 7, 126, 30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Cancel", IDCANCEL, 38, 126, 30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Reset", IDC_OPTIONS_RESET, 69, 126, 30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Help", IDC_OPTIONS_HELP, 100, 126, 30, 14, 0, WS_EX_LEFT
 }
 
 
@@ -83,8 +85,8 @@ IDI_ICON1          ICON           "Spout.ico"
 //
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 VS_VERSION_INFO VERSIONINFO
-    FILEVERSION     1,0,1,2
-    PRODUCTVERSION  1,0,1,2
+    FILEVERSION     1,0,1,3
+    PRODUCTVERSION  1,0,1,3
     FILEOS          VOS_NT
     FILETYPE        VFT_APP
     FILESUBTYPE     VFT2_UNKNOWN
@@ -97,12 +99,12 @@ VS_VERSION_INFO VERSIONINFO
         {
             VALUE "CompanyName", "Leading Edge Pty. Ltd.\0"
             VALUE "FileDescription", "SpoutDemo\0"
-            VALUE "FileVersion", "1.012\0"
+            VALUE "FileVersion", "1.013\0"
             VALUE "InternalName", "SpoutDemo\0"
-            VALUE "LegalCopyright", "Copyright \251 2022 Lynn Jarvis\0"
+            VALUE "LegalCopyright", "Copyright \251 2022-2023 Lynn Jarvis\0"
             VALUE "OriginalFilename", "SpoutDemo.exe\0"
             VALUE "ProductName", "SpoutDemo\0"
-            VALUE "ProductVersion", "1.012\0"
+            VALUE "ProductVersion", "1.013\0"
         }
     }
     BLOCK "VarFileInfo"

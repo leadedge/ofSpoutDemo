@@ -45,6 +45,10 @@
     <ClCompile Include="..\Spout.cpp">
       <Filter>SpoutGL</Filter>
     </ClCompile>
+    <ClCompile Include="..\SpoutShaders.cpp">
+      <Filter>SpoutGL</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SpoutRecord.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ofApp.h" />
@@ -94,6 +98,10 @@
     <ClInclude Include="..\SpoutUtils.h">
       <Filter>SpoutGL</Filter>
     </ClInclude>
+    <ClInclude Include="..\SpoutShaders.h">
+      <Filter>SpoutGL</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SpoutRecord.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Addons">
