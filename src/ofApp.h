@@ -92,7 +92,7 @@ class ofApp : public ofBaseApp{
 		bool bRecording = false; // Recording status
 		double StartRecordingTime = 0;
 		double ElapsedRecordingTime = 0.0f;
-		bool StartRecording();
+		bool StartRecording(bool prompt = false);
 		void StopRecording();
 		std::string EnterVideoName();
 		void WriteInitFile(const char* initfile);

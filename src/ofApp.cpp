@@ -63,6 +63,9 @@
 			   Remove "Video folder" item if disabled
 			   Add recording time display
 			   Version 1.013
+	02.09.23 - Receiver - add h264 quality and preset recording options
+			   Version 1.014
+
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -94,20 +97,26 @@ static PSTR szCaption;
 static INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam); // enter a sender name 
 static char g_ExePath[MAX_PATH]={0}; // Executable path
 static std::string extension = ".png"; // Capture type
-static bool bEnableRecording = false;
-static int codec = 0; // mpg4 / x264
-static bool bAudio = false; // system audio
+
 static bool bPrompt = false; // file name prompt
-static bool bDuration = false; // Record for fixed duration
-static long SecondsDuration = 0L; // Time to record
+static bool bDuration = false; // record for fixed duration
+static long SecondsDuration = 0L; // time to record
+static bool bAudio = false; // system audio
+static int codec = 0; // mpg4 / h264
+static int quality = 0; // h264 CRF
+static int preset = 0; // h264 preset
+static int presetindex = 0; // for the combobox
+
 // For cancel
 static std::string old_extension = extension;
-static bool old_bEnableRecording = bEnableRecording;
-static int  old_codec = codec;
-static bool old_bAudio = bAudio;
 static bool old_bPrompt = bPrompt;
 static bool old_bDuration = bDuration;
 static long old_SecondsDuration = SecondsDuration;
+static bool old_bAudio = bAudio;
+static int old_codec = codec;
+static int old_quality = quality;
+static int old_preset = preset;
+
 #endif
 
 
@@ -151,6 +160,7 @@ void ofApp::setup(){
 
 	// Load a font rather than the default
 	if(!myFont.load("fonts/DejaVuSans.ttf", 12, true, true))
+	// if (!myFont.load("fonts/Verdana.ttf", 12, true, true))
 	  printf("ofApp error - Font not loaded\n");
 
 	// Disable escape key exit
@@ -175,6 +185,7 @@ void ofApp::setup(){
 	HMENU hPopup = menu->AddPopupMenu(g_hMenu, "File");
 #ifdef BUILDRECEIVER
 	menu->AddPopupItem(hPopup, "Save image", false, false);
+	menu->AddPopupItem(hPopup, "Save video", false, false);
 #else
 	menu->AddPopupItem(hPopup, "Sender name", false, false);
 	menu->AddPopupSeparator(hPopup);
@@ -196,8 +207,10 @@ void ofApp::setup(){
 	menu->AddPopupItem(hPopup, "Full screen", false, false); // Unchecked, no auto-check
 	menu->AddPopupItem(hPopup, "Show info", true); // Checked, auto-check
 	menu->AddPopupSeparator(hPopup);
-	menu->AddPopupItem(hPopup, "Capture folder", false, false); // Not checked and not auto-check
-	// "Video folder" item is added by ReadInitFile and removed/added after Options dialog
+	menu->AddPopupItem(hPopup, "Capture folder", false, false);
+	// The "Video folder" item is removed from the Window menu by ReadInitFile
+	// if recording is not enabled and removed or added after the Options dialog
+	menu->AddPopupItem(hPopup, "Video folder", false, false);
 #else
 	menu->AddPopupItem(hPopup, "Show info", true); // Checked, auto-check
 #endif
@@ -266,7 +279,7 @@ void ofApp::setup(){
 	strcpy_s(g_Initfile, MAX_PATH, g_ExePath);
 	strcat_s(g_Initfile, MAX_PATH, "\\Spout Receiver.ini");
 
-	// Read menu settings
+	// Read recording and menu settings
 	ReadInitFile(g_Initfile);
 
 
@@ -442,19 +455,13 @@ void ofApp::draw() {
 			myFont.drawString(str, 20, 52);
 
 			// Show action keys
-			if (bEnableRecording) {
-				if (!bRecording) {
-					str = "F1 - start recording : F12 - capture";
-					myFont.drawString(str, 170, ofGetHeight() - 36);
-				}
-				else {
-					str = "F2 - stop recording";
-					myFont.drawString(str, 170, ofGetHeight() - 36);
-				}
+			if (!bRecording) {
+				str = "F1 - start recording : F12 - capture";
+				myFont.drawString(str, 170, ofGetHeight() - 36);
 			}
 			else {
-				str = "F12 - capture";
-				myFont.drawString(str, 244, ofGetHeight() - 36);
+				str = "F2 - stop recording";
+				myFont.drawString(str, 170, ofGetHeight() - 36);
 			}
 
 			// Show keyboard shortcuts
@@ -580,11 +587,10 @@ void ofApp::exit() {
 
 	// Close the sender or receiver on exit
 #ifdef BUILDRECEIVER
-	receiver.ReleaseReceiver();
-	// Save recording and capture settings
-	WriteInitFile(g_Initfile);
-	// Stop recording
 	StopRecording();
+	receiver.ReleaseReceiver();
+	// Save capture and recording settings
+	WriteInitFile(g_Initfile);
 #else
 	sender.ReleaseSender();
 #endif
@@ -657,7 +663,7 @@ void ofApp::keyPressed(int key) {
 
 		// Recording - F1 / F2 keys
 		if (key == OF_KEY_F1) {
-			StartRecording();
+			StartRecording(bPrompt);
 		}
 
 		if (key == OF_KEY_F2) {
@@ -736,6 +742,15 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 		}
 	}
 
+	if (title == "Save video") {
+		if (receiver.IsConnected())	{
+			StartRecording(true);
+		}
+		else {
+			SpoutMessageBox(NULL, "No sender", "Spout Receiver", MB_OK | MB_TOPMOST, 1400);
+		}
+	}
+	
 	//
 	// View menu
 	//
@@ -878,23 +893,24 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 #ifdef BUILDRECEIVER
 	if (title == "Options") {
 
-		old_codec = codec;
-		old_bAudio = bAudio;
+		old_extension = extension;
 		old_bPrompt = bPrompt;
 		old_bDuration = bDuration;
 		old_SecondsDuration = SecondsDuration;
-		old_bEnableRecording = bEnableRecording;
-		old_extension = extension;
+		old_bAudio = bAudio;
+		old_codec = codec;
+		old_quality = quality;
+		old_preset = preset;
 
-		DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_OPTIONSBOX), g_hWnd, Options);
-
-		// Has the user changed enable recording ?
-		if (bEnableRecording != old_bEnableRecording) {
-			HMENU hSubMenu = GetSubMenu(g_hMenu, 1); // Window sub-menu
-			if (!bEnableRecording)
-				RemoveMenu(hSubMenu, 6, MF_BYPOSITION);
-			else
-				menu->AddPopupItem(hSubMenu, "Video folder", false, false);
+		if (!DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_OPTIONSBOX), g_hWnd, Options)) {
+			extension = old_extension;
+			bPrompt = old_bPrompt;
+			bDuration = old_bDuration;
+			SecondsDuration = old_SecondsDuration;
+			bAudio = old_bAudio;
+			codec = old_codec;
+			quality = old_quality;
+			preset = old_preset;
 		}
 	}
 #endif
@@ -1041,13 +1057,13 @@ void ofApp::doFullScreen(bool bEnable, bool bPreviewMode)
 
 #ifdef BUILDRECEIVER
 // Recording start - F1
-bool ofApp::StartRecording()
+bool ofApp::StartRecording(bool prompt)
 {
-	// Return if not receiving, recording is disabled, already recording, preview or full screen
-	if (!receiver.IsConnected() || !bEnableRecording || bRecording || bPreview || bFullScreen)
+	// Return if not receiving, already recording, preview or full screen
+	if (!receiver.IsConnected() || bRecording || bPreview || bFullScreen)
 		return false;
 
-	if (bPrompt) {
+	if (prompt) {
 		std::string str = EnterVideoName();
 		if (str.empty())
 			return false;
@@ -1058,7 +1074,7 @@ bool ofApp::StartRecording()
 		g_OutputFile = g_ExePath; // exe folder
 		g_OutputFile += "\\data\\videos\\";
 		g_OutputFile += (char*)senderName;
-		if (codec == 1)
+		if (codec == 0)
 			g_OutputFile += ".mp4";
 		else
 			g_OutputFile += ".mkv";
@@ -1104,15 +1120,31 @@ void ofApp::StopRecording()
 			msgstr += tmp;
 
 			// Settings
-			if (codec == 0)
+			if (codec == 0) {
 				msgstr += "mpeg4 codec, ";
-			else
+			}
+			else {
 				msgstr += "x264 codec, ";
+				if (quality == 0)
+					msgstr += "low quality, ";
+				if (quality == 1)
+					msgstr += "medium quality, ";
+				if (quality == 2)
+					msgstr += "high quality, ";
+				if (preset == 0)
+					msgstr += "ultrafast, ";
+				if (preset == 1)
+					msgstr += "superfast, ";
+				if (preset == 2)
+					msgstr += "veryfast, ";
+				if (preset == 3)
+					msgstr += "faster, ";
+			}
 			if (bAudio)
 				msgstr += "system audio";
 			else
 				msgstr += "no audio\n";
-			SpoutMessageBox(NULL, msgstr.c_str(), "Saved video file", MB_OK | MB_TOPMOST, 2000);
+			SpoutMessageBox(NULL, msgstr.c_str(), "Saved video file", MB_OK | MB_ICONWARNING, 2000);
 		}
 	}
 
@@ -1169,21 +1201,6 @@ void ofApp::WriteInitFile(const char* initfile)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".png", (LPCSTR)initfile);
 	
 	// Recording options
-	if (bAudio)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"0", (LPCSTR)initfile);
-
-	if (codec == 1)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"0", (LPCSTR)initfile);
-
-	if (bEnableRecording)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Record", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Record", (LPCSTR)"0", (LPCSTR)initfile);
-
 	if (bPrompt)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"1", (LPCSTR)initfile);
 	else
@@ -1196,6 +1213,26 @@ void ofApp::WriteInitFile(const char* initfile)
 
 	sprintf_s(tmp, MAX_PATH, "%8ld", SecondsDuration);
 	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Seconds", (LPCSTR)tmp, (LPCSTR)initfile);
+
+	if (bAudio)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"0", (LPCSTR)initfile);
+
+	if (codec == 1)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"0", (LPCSTR)initfile);
+
+	if (quality == 0)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"0", (LPCSTR)initfile);
+	else if (quality == 1)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"2", (LPCSTR)initfile);
+
+	sprintf_s(tmp, MAX_PATH, "%d", preset);
+	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Preset", (LPCSTR)tmp, (LPCSTR)initfile);
 
 	// Menu options
 	if (bShowInfo)
@@ -1218,24 +1255,28 @@ void ofApp::ReadInitFile(const char* initfile)
 	char tmp[MAX_PATH]={0};
 
 	// Capture options
-	extension = ".png"; bAudio = false; codec = 0; bPrompt = 0;
+	extension = ".png";
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Imagetype", NULL, (LPSTR)tmp, 5, initfile);
 	if (tmp[0]) extension = tmp;
 	
 	// Recording options
-	bAudio = false; codec = 0; bPrompt = false; bDuration=false; SecondsDuration=0L; bEnableRecording = false;
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Codec", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) codec = atoi(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Audio", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bAudio = (atoi(tmp) == 1);
+	bPrompt = false; bDuration=false; SecondsDuration=0L;
+	bAudio = false; codec = 0; quality = 1; preset = 0;
+	
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Prompt", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) bPrompt = (atoi(tmp) == 1);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Duration", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) bDuration = (atoi(tmp) == 1);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Seconds", NULL, (LPSTR)tmp, 8, initfile);
 	if (tmp[0]) SecondsDuration = atol(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Record", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bEnableRecording = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Audio", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bAudio = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Codec", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) codec = atoi(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Quality", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) quality = atoi(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Preset", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) preset = atoi(tmp);
 
 	// Menu options
 	bShowInfo = true; bTopmost = false;
@@ -1257,11 +1298,6 @@ void ofApp::ReadInitFile(const char* initfile)
 		menu->SetPopupItem("Show info", true);
 	else
 		menu->SetPopupItem("Show info", false);
-
-	if (bEnableRecording) {
-		HMENU hSubMenu = GetSubMenu(g_hMenu, 1); // Window sub-menu
-		menu->AddPopupItem(hSubMenu, "Video folder", false, false);
-	}
 
 	// Set topmost or not
 	appMenuFunction("Show on top", bTopmost);
@@ -1296,7 +1332,7 @@ bool ofApp::EnterSenderName(char *SenderName, char *caption)
 }
 
 
-// Message handler for sender name entry for a sender
+// Message handler for sender name entry
 INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
@@ -1337,7 +1373,13 @@ INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
-	char tmp[256]={};
+	HWND hwndList = NULL;
+	HWND hwndUpDnCtl = NULL;
+	UINT nCode = 0;
+	int count = 0;
+	LPNMUPDOWN lpnmud={0};
+	char tmp[256]={0};
+	char presets[4][128] ={ "Ultrafast", "Superfast", "Veryfast", "Faster" };
 
 	switch (message) {
 
@@ -1347,25 +1389,63 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			int iPos = 0;
 			if (extension == ".tif") iPos = 1; // 0-png, 1-tif
 			CheckRadioButton(hDlg, IDC_PNG, IDC_TIF, IDC_PNG+iPos);
-
-			// Enable recording
-			CheckDlgButton(hDlg, IDC_RECORD, (UINT)bEnableRecording);
 			// File name prompt
 			CheckDlgButton(hDlg, IDC_PROMPT, (UINT)bPrompt);
 			// Record for duration
 			CheckDlgButton(hDlg, IDC_DURATION, (UINT)bDuration);
 			// Codec - 0-mpeg4, 1-x264
-			CheckRadioButton(hDlg, IDC_MPEG4, IDC_X264, IDC_MPEG4+(int)codec);
+			CheckRadioButton(hDlg, IDC_MPEG4, IDC_X264, IDC_MPEG4+codec);
 			// System audio
 			CheckDlgButton(hDlg, IDC_AUDIO, (UINT)bAudio);
 			// SecondsDuration
 			sprintf_s(tmp, "%ld", SecondsDuration);
 			SetDlgItemTextA(hDlg, IDC_SECONDS, (LPCSTR)tmp);
+			// Quality
+			CheckRadioButton(hDlg, IDC_QLOW, IDC_QHIGH, IDC_QLOW+(int)quality);
+			// Presets
+			hwndList = GetDlgItem(hDlg, IDC_PRESET);
+			SendMessageA(hwndList, (UINT)CB_RESETCONTENT, 0, 0L);
+			for (int k = 0; k < 4; k++)
+				SendMessageA(hwndList, (UINT)CB_ADDSTRING, 0, (LPARAM)presets[k]);
+			presetindex = preset;
+			SendMessageA(hwndList, CB_SETCURSEL, (WPARAM)presetindex, (LPARAM)0);
+			// Disable h264 options for mpeg4
+			if (codec == 0) {
+				// Quality
+				EnableWindow(GetDlgItem(hDlg, IDC_QLOW), FALSE);
+				EnableWindow(GetDlgItem(hDlg, IDC_QMED), FALSE);
+				EnableWindow(GetDlgItem(hDlg, IDC_QHIGH), FALSE);
+				// Preset
+				EnableWindow(GetDlgItem(hDlg, IDC_PRESET), FALSE);
+			}
 		}
 		return (INT_PTR)TRUE;
 
 	case WM_COMMAND:
+
+		// Combo box selection
+		if (HIWORD(wParam) == CBN_SELCHANGE) {
+			if ((HWND)lParam == GetDlgItem(hDlg, IDC_PRESET)) {
+				presetindex = static_cast<unsigned int>(SendMessageA((HWND)lParam, (UINT)CB_GETCURSEL, (WPARAM)0, (LPARAM)0));
+			}
+		}
+		// Drop though if not selected
+
 		switch (LOWORD(wParam)) {
+
+		case IDC_MPEG4:
+			EnableWindow(GetDlgItem(hDlg, IDC_QLOW), FALSE);
+			EnableWindow(GetDlgItem(hDlg, IDC_QMED), FALSE);
+			EnableWindow(GetDlgItem(hDlg, IDC_QHIGH), FALSE);
+			EnableWindow(GetDlgItem(hDlg, IDC_PRESET), FALSE);
+			break;
+
+		case IDC_X264:
+			EnableWindow(GetDlgItem(hDlg, IDC_QLOW), TRUE);
+			EnableWindow(GetDlgItem(hDlg, IDC_QMED), TRUE);
+			EnableWindow(GetDlgItem(hDlg, IDC_QHIGH), TRUE);
+			EnableWindow(GetDlgItem(hDlg, IDC_PRESET), TRUE);
+			break;
 
 		case IDC_OPTIONS_HELP:
 			{
@@ -1373,20 +1453,38 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				str += "Tif images, instead of default png, ";
 				str += "may be useful if the sender is producing 16 bit textures. ";
 				str += "The texture format is shown by the on-screen display or more details in the \"SpoutPanel\" sender selection dialog.\n\n";
-				str += "Enable\n";
-				str += "Enable or disable recording.\n\n";
+				
 				str += "File name\nPrompt for file name and show file details after save. By default, a file with the sender name is saved in \"data\\videos\" and over-written if it exists.\n\n";
+
 				str += "Duration\nRecord for a fixed amount of time.\n";
-				str += "Seconds\nTime to record in seconds.\n\n";
-				str += "Codec\n";
-				str += "x264 codec can be used instead of default Mpeg4. ";
-				str += "Playback compatibility and quality may be improved. File size approximately 20% less.\n\n";
+				str += "Seconds - the time to record in seconds.\n\n";
+
 				str += "Audio\nRecord system audio with the video, ";
 				str += "A DirectShow <a href=\"https://github.com/rdp/virtual-audio-capture-grabber-device/\">virtual audio device</a>, ";
 				str += "developed by Roger Pack, allows FFmpeg to record system audio together with the video. ";
 				str += "Register it using \"VirtualAudioRegister.exe\" in the <a href=\"";
 				str += g_ExePath;
 				str += "\\data\\audio\\VirtualAudio\">\"VirtualAudio\"</a> folder.\n\n";
+
+				str += "Codec\n";
+				str += "<a href=\"https://trac.ffmpeg.org/wiki/Encode/MPEG-4\">Mpeg4</a> is a well established codec that performs well for most systems. ";
+				str += "<a href=\"https://trac.ffmpeg.org/wiki/Encode/H.264\">h264</a> is a modern codec with more control over ";
+				str += "quality, encoding speed and file size.\n\n";
+
+				str += "Quality\n";
+				str += "h264 constant rate factor CRF (0 > 51) : low = 28, medium = 23, high = 18. ";
+				str += "High quality is effectively lossless, but will create a larger file. ";
+				str += "Low quality will create a smaller file at the expense of quality. ";
+				str += "Medium is the default, a balance between file size and quality.\n\n";
+
+				str += "Preset\n";
+				str += "h264 preset : ultrafast, superfast, veryfast, faster.\n";
+				str += "Presets affect encoding speed and compression ratio. ";
+				str += "These are the presets necessary for real-time encoding. ";
+				str += "Higher speed presets encode faster but produce progressively larger files. ";
+				str += "If a slower preset is chosen to reduce file size, check that it does not ";
+				str += "introduce hesitations or missed frames.\n\n\n";
+
 				SpoutMessageBox(NULL, str.c_str(), "Options", MB_OK | MB_TOPMOST);
 			}
 			break;
@@ -1394,49 +1492,47 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		case IDC_OPTIONS_RESET:
 		{
 			extension = ".png";
-			codec = 0;
-			bAudio = false;
 			bPrompt = false;
 			bDuration = false;
 			SecondsDuration = 0L;
-			bEnableRecording = false;
+			bAudio = false;
+			codec = 0;
+			quality = 1;
+			preset = 0;
 			SendMessage(hDlg, WM_INITDIALOG, 0, 0L);
 		}
 		break;
 
 		case IDOK:
 			extension = ".png";
-			codec = 0;
-			bAudio = false;
 			bPrompt = false;
 			bDuration = false;
 			SecondsDuration = 0L;
-			bEnableRecording = false;
+			bAudio = false;
+			codec = 0;
+			quality = 1;
+			preset = 0;
 			if (IsDlgButtonChecked(hDlg, IDC_TIF) == BST_CHECKED)
 				extension = ".tif";
-			if (IsDlgButtonChecked(hDlg, IDC_RECORD) == BST_CHECKED)
-				bEnableRecording = true;
 			if (IsDlgButtonChecked(hDlg, IDC_PROMPT) == BST_CHECKED)
 				bPrompt = true;
 			if (IsDlgButtonChecked(hDlg, IDC_DURATION) == BST_CHECKED)
 				bDuration = true;
-			if (IsDlgButtonChecked(hDlg, IDC_X264) == BST_CHECKED)
-				codec = 1;
-			if (IsDlgButtonChecked(hDlg, IDC_AUDIO) == BST_CHECKED)
-				bAudio = true;
 			GetDlgItemTextA(hDlg, IDC_SECONDS, (LPSTR)tmp, 256);
 			SecondsDuration = atol(tmp);
+			if (IsDlgButtonChecked(hDlg, IDC_AUDIO) == BST_CHECKED)
+				bAudio = true;
+			if (IsDlgButtonChecked(hDlg, IDC_X264) == BST_CHECKED)
+				codec = 1;
+			if (IsDlgButtonChecked(hDlg, IDC_QLOW) == BST_CHECKED)
+				quality = 0;
+			if (IsDlgButtonChecked(hDlg, IDC_QHIGH) == BST_CHECKED)
+				quality = 2;
+			preset = presetindex;
 			EndDialog(hDlg, 1);
 			break;
 
 		case IDCANCEL:
-			codec = old_codec;
-			bAudio = old_bAudio;
-			bPrompt = old_bPrompt;
-			bDuration = old_bDuration;
-			SecondsDuration = old_SecondsDuration;
-			bEnableRecording = old_bEnableRecording;
-			extension = old_extension;
 			EndDialog(hDlg, 0);
 			return (INT_PTR)TRUE;
 
