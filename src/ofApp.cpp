@@ -64,8 +64,9 @@
 			   Add recording time display
 			   Version 1.013
 	02.09.23 - Receiver - add h264 quality and preset recording options
+	04.09.23 - Options for display of file save as well as prompt for file name
+			   Changes to image save to use common dialog
 			   Version 1.014
-
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -98,7 +99,8 @@ static INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 static char g_ExePath[MAX_PATH]={0}; // Executable path
 static std::string extension = ".png"; // Capture type
 
-static bool bPrompt = false; // file name prompt
+static bool bPrompt = false; // file name entry dialog
+static bool bShowFile = false; // show file name details after save
 static bool bDuration = false; // record for fixed duration
 static long SecondsDuration = 0L; // time to record
 static bool bAudio = false; // system audio
@@ -108,14 +110,15 @@ static int preset = 0; // h264 preset
 static int presetindex = 0; // for the combobox
 
 // For cancel
-static std::string old_extension = extension;
-static bool old_bPrompt = bPrompt;
-static bool old_bDuration = bDuration;
-static long old_SecondsDuration = SecondsDuration;
-static bool old_bAudio = bAudio;
-static int old_codec = codec;
-static int old_quality = quality;
-static int old_preset = preset;
+std::string old_extension = extension;
+bool old_bPrompt = bPrompt;
+bool old_bShowFile = bShowFile;
+bool old_bDuration = bDuration;
+long old_SecondsDuration = SecondsDuration;
+bool old_bAudio = bAudio;
+int old_codec = codec;
+int old_quality = quality;
+int old_preset = preset;
 
 #endif
 
@@ -281,6 +284,9 @@ void ofApp::setup(){
 
 	// Read recording and menu settings
 	ReadInitFile(g_Initfile);
+
+	// Custom icon for the SpoutMessagBox, activated by MB_USERICON
+	SpoutMessageBoxIcon(LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
 
 
 #else
@@ -723,6 +729,21 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	if (title == "Save image") {
 		if (receiver.IsConnected())
 		{
+			// LJ DEBUG
+			std::string name = EnterFileName(2);
+			if (name.empty())
+				return;
+
+			// Add the default extension if none entered
+			std::size_t found = name.find('.');
+			if (found == std::string::npos)
+				name += ".png";
+			ofImage myImage;
+			myTexture.readToPixels(myImage.getPixels());
+			// Save to bin>data
+			myImage.save(name);
+
+			/*
 			char imagename[MAX_PATH];
 			imagename[0] = 0; // No existing name
 			if (EnterSenderName(imagename, "Enter image name and extension")) {
@@ -736,9 +757,11 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 				// Save to bin>data
 				myImage.save(name);
 			}
+			*/
+
 		}
 		else {
-			SpoutMessageBox(NULL, "No sender", "Spout Receiver", MB_OK | MB_TOPMOST, 1400);
+			SpoutMessageBox(NULL, "No sender", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 1400);
 		}
 	}
 
@@ -747,7 +770,7 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 			StartRecording(true);
 		}
 		else {
-			SpoutMessageBox(NULL, "No sender", "Spout Receiver", MB_OK | MB_TOPMOST, 1400);
+			SpoutMessageBox(NULL, "No sender", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 1400);
 		}
 	}
 	
@@ -799,7 +822,12 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 				SpoutMessageBox(NULL, "Unsupported format", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2000);
 				return;
 			}
-			SpoutMessageBox(NULL, imagename.c_str(), "Saved image", MB_OK | MB_TOPMOST, 2000); // 2 second timeout
+			if (bShowFile) {
+				SpoutMessageBox(NULL, imagename.c_str(), "Saved image", MB_OK | MB_ICONINFORMATION | MB_TOPMOST, 2500); // 2.5 second timeout
+			}
+			else {
+				SpoutMessageBox(NULL, imagename.c_str(), "Saved image", MB_OK | MB_TOPMOST, 1000); // Brief, silent popup
+			}
 		}
 		else {
 			SpoutMessageBox(NULL, "No sender\nImage capture not possible", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2000);
@@ -895,6 +923,7 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 
 		old_extension = extension;
 		old_bPrompt = bPrompt;
+		old_bShowFile = bShowFile;
 		old_bDuration = bDuration;
 		old_SecondsDuration = SecondsDuration;
 		old_bAudio = bAudio;
@@ -905,6 +934,7 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 		if (!DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_OPTIONSBOX), g_hWnd, Options)) {
 			extension = old_extension;
 			bPrompt = old_bPrompt;
+			bShowFile = old_bShowFile;
 			bDuration = old_bDuration;
 			SecondsDuration = old_SecondsDuration;
 			bAudio = old_bAudio;
@@ -1064,7 +1094,7 @@ bool ofApp::StartRecording(bool prompt)
 		return false;
 
 	if (prompt) {
-		std::string str = EnterVideoName();
+		std::string str = EnterFileName(codec);
 		if (str.empty())
 			return false;
 		g_OutputFile = str;
@@ -1106,46 +1136,46 @@ void ofApp::StopRecording()
 		recorder.Stop();
 
 		// Show a messagebox with video file details
-		if (bPrompt) {
+		// Video file name without full path
+		char filename[MAX_PATH]={};
+		strcpy_s(filename, MAX_PATH, g_OutputFile.c_str());
+		PathStripPathA(filename);
+		std::string msgstr = filename;
 
-			// Video file name without full path
-			char filename[MAX_PATH]={};
-			strcpy_s(filename, MAX_PATH, g_OutputFile.c_str());
-			PathStripPathA(filename);
-			std::string msgstr = filename;
+		// Duration
+		char tmp[MAX_PATH]={};
+		sprintf_s(tmp, MAX_PATH, " (%.2f seconds)\n\n", (float)ElapsedRecordingTime);
+		msgstr += tmp;
 
-			// Duration
-			char tmp[MAX_PATH]={};
-			sprintf_s(tmp, MAX_PATH, " (%.2f seconds)\n\n", (float)ElapsedRecordingTime);
-			msgstr += tmp;
-
-			// Settings
-			if (codec == 0) {
-				msgstr += "mpeg4 codec, ";
-			}
-			else {
-				msgstr += "x264 codec, ";
-				if (quality == 0)
-					msgstr += "low quality, ";
-				if (quality == 1)
-					msgstr += "medium quality, ";
-				if (quality == 2)
-					msgstr += "high quality, ";
-				if (preset == 0)
-					msgstr += "ultrafast, ";
-				if (preset == 1)
-					msgstr += "superfast, ";
-				if (preset == 2)
-					msgstr += "veryfast, ";
-				if (preset == 3)
-					msgstr += "faster, ";
-			}
-			if (bAudio)
-				msgstr += "system audio";
-			else
-				msgstr += "no audio\n";
-			SpoutMessageBox(NULL, msgstr.c_str(), "Saved video file", MB_OK | MB_ICONWARNING, 2000);
+		// Settings
+		if (codec == 0) {
+			msgstr += "mpeg4 codec, ";
 		}
+		else {
+			msgstr += "x264 codec, ";
+			if (quality == 0)
+				msgstr += "low quality, ";
+			if (quality == 1)
+				msgstr += "medium quality, ";
+			if (quality == 2)
+				msgstr += "high quality, ";
+			if (preset == 0)
+				msgstr += "ultrafast, ";
+			if (preset == 1)
+				msgstr += "superfast, ";
+			if (preset == 2)
+				msgstr += "veryfast, ";
+			if (preset == 3)
+				msgstr += "faster, ";
+		}
+		if (bAudio)
+			msgstr += "system audio";
+		else
+			msgstr += "no audio\n";
+		if (bShowFile)
+			SpoutMessageBox(NULL, msgstr.c_str(), "Saved video file", MB_OK | MB_ICONINFORMATION, 3000);
+		else
+			SpoutMessageBox(NULL, msgstr.c_str(), "Saved video file", MB_OK, 1000);
 	}
 
 	bRecording = false;
@@ -1156,10 +1186,32 @@ void ofApp::StopRecording()
 //
 // User file name entry
 //
-std::string ofApp::EnterVideoName()
+// Type :
+//    0 - mp4 video
+//    1 - mkv video
+//    2 - image file png, tif or other
+//
+std::string ofApp::EnterFileName(int type)
 {
 	char filePath[MAX_PATH]={0};
-	sprintf_s(filePath, MAX_PATH, g_OutputFile.c_str());
+	if (type < 2) {
+		// Default video output path
+		if (g_OutputFile.empty()) {
+			g_OutputFile = g_ExePath; // exe folder
+			g_OutputFile += "\\data\\videos\\";
+			g_OutputFile += senderName;
+			sprintf_s(filePath, MAX_PATH, g_OutputFile.c_str());
+		}
+	}
+	else {
+		// Default image output path
+		if (g_OutputImage.empty()) {
+			g_OutputImage = g_ExePath; // exe folder
+			g_OutputImage += "\\data\\captures\\";
+			g_OutputImage += senderName;
+			sprintf_s(filePath, MAX_PATH, g_OutputImage.c_str());
+		}
+	}
 
 	OPENFILENAMEA ofn={};
 	ofn.lStructSize = sizeof(OPENFILENAMEA);
@@ -1170,18 +1222,28 @@ std::string ofApp::EnterVideoName()
 	// if ofn.lpstrFile contains a path, that path is the initial directory.
 	ofn.lpstrFile = (LPSTR)filePath;
 	ofn.nMaxFile = MAX_PATH;
-	if (codec == 1)
-		ofn.lpstrFilter = "Matroska (*.mkv)\0*.mkv\0Mpeg-4 (*.mp4)\0*.mp4\0Audio Video Interleave (*.avi)\0*.avi\0Quicktime (*.mov)\0*.mov\0All files (*.*)\0*.*\0";
-	else
+	// Type can be codec = 0, 1 or 2 for image
+	if (type == 0)
 		ofn.lpstrFilter = "Mpeg-4 (*.mp4)\0*.mp4\0Matroska (*.mkv)\0*.mkv\0Audio Video Interleave (*.avi)\0*.avi\0Quicktime (*.mov)\0*.mov\0All files (*.*)\0*.*\0";
+	else if (type == 1)
+		ofn.lpstrFilter = "Matroska (*.mkv)\0*.mkv\0Mpeg-4 (*.mp4)\0*.mp4\0Audio Video Interleave (*.avi)\0*.avi\0Quicktime (*.mov)\0*.mov\0All files (*.*)\0*.*\0";
+	else {
+		// Other image types supported by Openframeworks
+		// .bmp, .jpg, .pcx, .pgm, .png, .ppm, .tga, .tif, .gif, 
+		if(extension == ".tif")
+			ofn.lpstrFilter = "Tif image (*.tif)\0*.tif\0Png image (*.png)\0*.png\0Jpg image(*.jpg)\0*.jpg\0Bmp image (*.bmp)\0*.bmp\0Tga image(*.tga)\0*.tga\0Gif image (*.gif)\0*.gif\0All files (*.*)\0*.*\0";
+		else
+			ofn.lpstrFilter = "Png image (*.png)\0*.png\0Tif image (*.tif)\0*.tif\0Jpg image(*.jpg)\0*.jpg\0Bmp image (*.bmp)\0*.bmp\0Tga image(*.tga)\0*.tga\0Gif image (*.gif)\0*.gif\0All files (*.*)\0*.*\0";
+	}
 	ofn.lpstrDefExt = "";
 	// OFN_OVERWRITEPROMPT prompts for over-write
 	ofn.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
 	ofn.lpstrTitle = "Output File";
 	if (!GetSaveFileNameA(&ofn)) {
-		// FFmpeg has not been started yet, return to try again
+		// Return to try again
 		return "";
 	}
+
 	// User file name entry
 	return filePath;
 }
@@ -1205,6 +1267,11 @@ void ofApp::WriteInitFile(const char* initfile)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"1", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"0", (LPCSTR)initfile);
+
+	if (bShowFile)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Showfile", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Showfile", (LPCSTR)"0", (LPCSTR)initfile);
 
 	if (bDuration)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Duration", (LPCSTR)"1", (LPCSTR)initfile);
@@ -1260,11 +1327,13 @@ void ofApp::ReadInitFile(const char* initfile)
 	if (tmp[0]) extension = tmp;
 	
 	// Recording options
-	bPrompt = false; bDuration=false; SecondsDuration=0L;
+	bPrompt = false; bShowFile = false; bDuration=false; SecondsDuration=0L;
 	bAudio = false; codec = 0; quality = 1; preset = 0;
 	
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Prompt", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) bPrompt = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Showfile", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bShowFile = (atoi(tmp) == 1);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Duration", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) bDuration = (atoi(tmp) == 1);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Seconds", NULL, (LPSTR)tmp, 8, initfile);
@@ -1389,8 +1458,10 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			int iPos = 0;
 			if (extension == ".tif") iPos = 1; // 0-png, 1-tif
 			CheckRadioButton(hDlg, IDC_PNG, IDC_TIF, IDC_PNG+iPos);
-			// File name prompt
+			// File name entry prompt
 			CheckDlgButton(hDlg, IDC_PROMPT, (UINT)bPrompt);
+			// Show file details
+			CheckDlgButton(hDlg, IDC_SHOWFILE, (UINT)bShowFile);
 			// Record for duration
 			CheckDlgButton(hDlg, IDC_DURATION, (UINT)bDuration);
 			// Codec - 0-mpeg4, 1-x264
@@ -1454,7 +1525,8 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				str += "may be useful if the sender is producing 16 bit textures. ";
 				str += "The texture format is shown by the on-screen display or more details in the \"SpoutPanel\" sender selection dialog.\n\n";
 				
-				str += "File name\nPrompt for file name and show file details after save. By default, a file with the sender name is saved in \"data\\videos\" and over-written if it exists.\n\n";
+				str += "File save\nOpen a file save dialog before recording.\nBy default, a file with the sender name is saved in \"data\\videos\" and over-written if it exists.\n\n";
+				str += "File name\nShow file details after recording a video or saving an image.\nBy default, a silent message opens briefly.\n\n";
 
 				str += "Duration\nRecord for a fixed amount of time.\n";
 				str += "Seconds - the time to record in seconds.\n\n";
@@ -1467,7 +1539,8 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				str += "\\data\\audio\\VirtualAudio\">\"VirtualAudio\"</a> folder.\n\n";
 
 				str += "Codec\n";
-				str += "<a href=\"https://trac.ffmpeg.org/wiki/Encode/MPEG-4\">Mpeg4</a> is a well established codec that performs well for most systems. ";
+				str += "<a href=\"https://trac.ffmpeg.org/wiki/Encode/MPEG-4\">Mpeg4</a> is a well established codec ";
+				str += "that provides good video quality at high speed. ";
 				str += "<a href=\"https://trac.ffmpeg.org/wiki/Encode/H.264\">h264</a> is a modern codec with more control over ";
 				str += "quality, encoding speed and file size.\n\n";
 
@@ -1485,7 +1558,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				str += "If a slower preset is chosen to reduce file size, check that it does not ";
 				str += "introduce hesitations or missed frames.\n\n\n";
 
-				SpoutMessageBox(NULL, str.c_str(), "Options", MB_OK | MB_TOPMOST);
+				SpoutMessageBox(NULL, str.c_str(), "Options", MB_OK | MB_USERICON | MB_TOPMOST);
 			}
 			break;
 
@@ -1493,6 +1566,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			extension = ".png";
 			bPrompt = false;
+			bShowFile = false;
 			bDuration = false;
 			SecondsDuration = 0L;
 			bAudio = false;
@@ -1506,6 +1580,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		case IDOK:
 			extension = ".png";
 			bPrompt = false;
+			bShowFile = false;
 			bDuration = false;
 			SecondsDuration = 0L;
 			bAudio = false;
@@ -1516,6 +1591,8 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				extension = ".tif";
 			if (IsDlgButtonChecked(hDlg, IDC_PROMPT) == BST_CHECKED)
 				bPrompt = true;
+			if (IsDlgButtonChecked(hDlg, IDC_SHOWFILE) == BST_CHECKED)
+				bShowFile = true;
 			if (IsDlgButtonChecked(hDlg, IDC_DURATION) == BST_CHECKED)
 				bDuration = true;
 			GetDlgItemTextA(hDlg, IDC_SECONDS, (LPSTR)tmp, 256);

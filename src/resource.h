@@ -10,9 +10,10 @@
 #define IDD_ABOUTBOX                            500
 #define IDD_NAMEBOX                             501
 #define IDD_OPTIONSBOX                          503
-#define IDC_PNG                                 40002
-#define IDC_TIF                                 40003
-#define IDC_PROMPT                              40004
+#define IDC_PNG                                 40001
+#define IDC_TIF                                 40002
+#define IDC_PROMPT                              40003
+#define IDC_SHOWFILE                            40004
 #define IDC_DURATION                            40005
 #define IDC_SECONDS                             40006
 #define IDC_AUDIO                               40007

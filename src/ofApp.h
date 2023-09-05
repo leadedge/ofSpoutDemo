@@ -89,12 +89,13 @@ class ofApp : public ofBaseApp{
 		std::string g_FFmpegPath;
 		std::string g_FFmpegCodec;
 		std::string g_OutputFile;
+		std::string g_OutputImage;
 		bool bRecording = false; // Recording status
 		double StartRecordingTime = 0;
 		double ElapsedRecordingTime = 0.0f;
 		bool StartRecording(bool prompt = false);
 		void StopRecording();
-		std::string EnterVideoName();
+		std::string EnterFileName(int type);
 		void WriteInitFile(const char* initfile);
 		void ReadInitFile(const char* initfile);
 #endif
