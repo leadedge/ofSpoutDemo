@@ -1,3 +1,6 @@
+// To avoid Openframeworks warning
+#define BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
+
 #include "ofMain.h"
 #include "ofApp.h"
 

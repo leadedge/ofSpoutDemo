@@ -1,7 +1,9 @@
 # ofSpoutDemo
 Spout Openframeworks Demo program
 
-This program is intended as an example of using Spout library functions and creating a menu using the [ofxWinMenu](https://github.com/leadedge/ofxWinMenu) addon. Also, the receiver includes image capture and as video recording functions using a "SpoutRecord" class to manage FFmpeg recording by way of a pipe.
+This program is intended as an example of using Spout library functions and using additional features such as creating a menu using the [ofxWinMenu](https://github.com/leadedge/ofxWinMenu) addon, the "SpoutRecord" class for recording video with FFmpeg and the "SpoutShaders" class for high speed, live image adjustment using compute shaders.
+
+The receiver includes image capture, video recording, image adjustment and dialogs to manage them. 16 bit and floating point textures can be received from applications that support them and multipe image types can be saved, including [High dynamic range](https://paulbourke.net/dataformats/pic/index.html) for 32bit float textures.
 
 ## Binaries
 
@@ -27,22 +29,11 @@ Enter a file name to capture with an extension of the required type (jpg, png, b
 * Save video\
 Enter a file name to record. Default folder is bin\data\videos.
 
-### Window menu
-* Show on top\
-Make the window topmost.
-* Preview\
-Remove menu, caption and borders and keep the sender display topmost and at the position of the window.
-* Full screen\
-Full screen display on the monitor wher the program was executed.
-* Show info\
-Show or hide the on-screen display.
-* Capture folder
-* Video folder\
-Opens file explorer to show captured images and recorder videos.
-
-### Help > Options
+### View menu
+* Adjust\
+Image adjustment
+* Options\
 Opens a dialog with capture and recording options.
-
 * Image type - png or tif\
 Tif images can be produced instead of default png.
 * Enable\
@@ -62,6 +53,20 @@ h264 constant rate factor CRF (0 > 51) : low = 28, medium = 23, high = 18.
 ultrafast, superfast, veryfast, faster
 * HELP button\
 Shows details of the options.
+* Capture folder
+* Video folder\
+Opens file explorer to show captured images and recorded videos.
+
+### Window menu
+* Show on top\
+Make the window topmost.
+* Preview\
+Remove menu, caption and borders and keep the sender display topmost and at the position of the window.
+* Full screen\
+Full screen display on the monitor wher the program was executed.
+* Show info\
+Show or hide the on-screen display.
+
 
 ## Building the project
 
@@ -127,7 +132,8 @@ Find in ofApp.h :\
 
 ### Modifications
 
-The code may contain functions which are not documented. As many comments as possible are included in the source files.
+The code may contain functions that are not documented. As many comments as possible are included in the source files.
+
 
 
 

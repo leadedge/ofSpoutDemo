@@ -1,5 +1,6 @@
+### FFmpeg.exe is required in this folder
 
-FFmpeg.exe is required.
+To get the latest version -
 
 * Go to https://github.com/GyanD/codexffmpeg/releases
 * Choose the "Essentials" build. e.g. "ffmpeg-6.0-essentials_build.zip" and download the archive.

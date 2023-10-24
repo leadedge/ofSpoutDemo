@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <iostream>
 
-// #define SPOUTGL
+#define SPOUTGL
 
 // Change path as necessary
 #ifdef SPOUTGL

@@ -67,6 +67,13 @@
 	04.09.23 - Options for display of file save as well as prompt for file name
 			   Changes to image save to use common dialog
 			   Version 1.014
+	08.09.23 - Larger font for dialogs
+			   SpoutMessageBox for About instead of dialog
+	09.09.23 - Corrected save for float format GL_RGBA16F Float and GL_RGBA32F
+	11.20.23 - Add hdr format for 32/16bit float textures (stb_image_write.h)
+			   Add image adjustment dialog and shaders (SpoutShader class)
+			   Version 1.015
+
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -88,17 +95,22 @@
 #include "ofApp.h"
 #include "resource.h"
 
+// STB for hdr image format
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 // DIALOGS
 
+// Sender name entry
 static INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam); // enter a sender name 
 static PSTR szText;
 static PSTR szCaption;
 
+// Capture and recording options
 #ifdef BUILDRECEIVER
 static INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam); // enter a sender name 
 static char g_ExePath[MAX_PATH]={0}; // Executable path
 static std::string extension = ".png"; // Capture type
-
 static bool bPrompt = false; // file name entry dialog
 static bool bShowFile = false; // show file name details after save
 static bool bDuration = false; // record for fixed duration
@@ -108,7 +120,9 @@ static int codec = 0; // mpg4 / h264
 static int quality = 0; // h264 CRF
 static int preset = 0; // h264 preset
 static int presetindex = 0; // for the combobox
-
+static int imagetype = 0; // Image type index
+static int imagetypeindex = 0; // Image type index
+static char imagetypes[5][128] ={ ".png", ".tif", ".jpg", ".bmp", ".hdr" };
 // For cancel
 std::string old_extension = extension;
 bool old_bPrompt = bPrompt;
@@ -119,17 +133,41 @@ bool old_bAudio = bAudio;
 int old_codec = codec;
 int old_quality = quality;
 int old_preset = preset;
+int old_imagetype = imagetype;
+
+//
+// Adjustment controls modeless dialog
+//
+LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+static HWND hwndAdjust = NULL;
+
+spoutShaders shaders;
+static float Brightness = 0.0;
+static float Contrast   = 1.0;
+static float Saturation = 1.0;
+static float Gamma      = 1.0;
+static float Blur       = 0.0;
+static float Sharpness  = 0.0;
+static float Sharpwidth = 3.0; // 3x3, 5x5, 7x7
+static bool bFlip       = false;
+static bool bMirror     = false;
+static bool bSwap       = false;
+// For the dialog
+static float OldBrightness = 0.0;
+static float OldContrast   = 1.0;
+static float OldSaturation = 1.0;
+static float OldGamma      = 1.0;
+static float OldBlur       = 0.0;
+static float OldSharpness  = 0.0;
+static float OldSharpwidth = 3.0;
+static bool OldFlip        = false;
+static bool OldMirror      = false;
+static bool OldSwap        = false;
 
 #endif
 
-
-static INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
-static int spoutVersion = 0;
-static HINSTANCE g_hInstance;
-static HWND g_hWnd;
-
 //--------------------------------------------------------------
-void ofApp::setup(){
+void ofApp::setup() {
 
 	ofBackground(0, 0, 0);
 
@@ -150,7 +188,6 @@ void ofApp::setup(){
 	// EnableSpoutLog(); // Log to console
 	// SetSpoutLogLevel(SpoutLogLevel::SPOUT_LOG_WARNING); // Log warnings only
 	// EnableSpoutLogFile(senderName); // Log to file
-	// printf("ofSpoutDemo\n");
 
 	// Instance
 	g_hInstance = GetModuleHandle(NULL);
@@ -162,9 +199,8 @@ void ofApp::setup(){
 	SetClassLongPtrA(g_hWnd, GCLP_HICON, (LONG_PTR)LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
 
 	// Load a font rather than the default
-	if(!myFont.load("fonts/DejaVuSans.ttf", 12, true, true))
-	// if (!myFont.load("fonts/Verdana.ttf", 12, true, true))
-	  printf("ofApp error - Font not loaded\n");
+	if (!myFont.load("fonts/DejaVuSans.ttf", 12, true, true))
+		printf("ofApp error - Font not loaded\n");
 
 	// Disable escape key exit
 	ofSetEscapeQuitsApp(false);
@@ -197,6 +233,19 @@ void ofApp::setup(){
 	menu->AddPopupItem(hPopup, "Exit", false, false);
 
 	//
+	// "View" popup
+	//
+#ifdef BUILDRECEIVER
+	hPopup = menu->AddPopupMenu(g_hMenu, "View");
+	menu->AddPopupItem(hPopup, "Adjust", false, false);
+	menu->AddPopupItem(hPopup, "Options", false, false); // No auto check
+	menu->AddPopupItem(hPopup, "Capture folder", false, false);
+	// The "Video folder" item is removed from the Window menu by ReadInitFile
+	// if recording is not enabled and removed or added after the Options dialog
+	menu->AddPopupItem(hPopup, "Video folder", false, false);
+#endif
+
+	//
 	// "Window" popup
 	//
 	hPopup = menu->AddPopupMenu(g_hMenu, "Window");
@@ -209,11 +258,6 @@ void ofApp::setup(){
 	bFullScreen = false;
 	menu->AddPopupItem(hPopup, "Full screen", false, false); // Unchecked, no auto-check
 	menu->AddPopupItem(hPopup, "Show info", true); // Checked, auto-check
-	menu->AddPopupSeparator(hPopup);
-	menu->AddPopupItem(hPopup, "Capture folder", false, false);
-	// The "Video folder" item is removed from the Window menu by ReadInitFile
-	// if recording is not enabled and removed or added after the Options dialog
-	menu->AddPopupItem(hPopup, "Video folder", false, false);
 #else
 	menu->AddPopupItem(hPopup, "Show info", true); // Checked, auto-check
 #endif
@@ -222,11 +266,10 @@ void ofApp::setup(){
 	// "Help" popup
 	//
 	hPopup = menu->AddPopupMenu(g_hMenu, "Help");
-#ifdef BUILDRECEIVER
-	menu->AddPopupItem(hPopup, "Options", false, false); // No auto check
-#endif
+
+	// Common
 	menu->AddPopupItem(hPopup, "About", false, false); // No auto check
-	
+
 	// Adjust window to desired client size allowing for the menu
 	RECT rect;
 	GetClientRect(g_hWnd, &rect);
@@ -248,7 +291,7 @@ void ofApp::setup(){
 	// 3D drawing setup for the demo 
 	ofDisableArbTex(); // Needed for ofBox texturing
 	myBoxImage.load("images/SpoutLogoMarble3.jpg"); // image for the cube texture
- 	rotX = 0.0f;
+	rotX = 0.0f;
 	rotY = 0.0f;
 
 	// Set the sender size
@@ -288,7 +331,6 @@ void ofApp::setup(){
 	// Custom icon for the SpoutMessagBox, activated by MB_USERICON
 	SpoutMessageBoxIcon(LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
 
-
 #else
 	// ---------------------------------------------------------------------------
 	//
@@ -302,7 +344,8 @@ void ofApp::setup(){
 	//       GL_RGB10_A2  10 bit 2 bit alpha	(DXGI_FORMAT_R10G10B10A2_UNORM)
 	//       GL_RGBA       8 bit                (DXGI_FORMAT_R8G8B8A8_UNORM)
 	//
-	glFormat = GL_RGB16; // Example 16 bit rgba
+	// glFormat = GL_RGB16; // Example 16 bit rgba
+
 	//
 	// Set a compatible DirectX 11 shared texture format for the sender
 	// so that receivers get a texture with the same format.
@@ -385,18 +428,14 @@ void ofApp::draw() {
 		if (receiver.IsUpdated()) {
 
 			// Allocate an application texture with the same OpenGL format as the sender
-			// The received texture format (glFormat) determines image capture bit depth and type
+			// The received texture format determines image capture bit depth and type
 			glFormat = receiver.GLDXformat();
 			myTexture.allocate(receiver.GetSenderWidth(), receiver.GetSenderHeight(), glFormat);
 
-			// Has the sender name changed ?
-			if (strcmp(receiver.GetSenderName(), senderName) != 0) {
-				// Stop recording
-				StopRecording();
-			}
-
-			// Has the sender size changed ?
-			if (senderWidth != receiver.GetSenderWidth() || senderHeight != receiver.GetSenderHeight()) {
+			// Stop recording if the sender name or size has changed
+			if (strcmp(receiver.GetSenderName(), senderName) != 0
+			    || senderWidth != receiver.GetSenderWidth()
+				|| senderHeight != receiver.GetSenderHeight()) {
 				StopRecording();
 			}
 
@@ -406,6 +445,54 @@ void ofApp::draw() {
 
 		}
 
+		// Activate shaders on the received texture
+		// Shaders have source and destination textures
+		// but the source texture can also be the destination
+		// rgba texture format required
+		if (receiver.IsFrameNew() && (glFormat == GL_RGBA || glFormat == GL_RGBA8)) {
+
+			GLuint myTextureID = myTexture.getTextureData().textureID;
+
+			// Brightness    -1 - 1   default 0
+			// Contrast       0 - 4   default 1
+			// Saturation     0 - 4   default 1
+			// Gamma          0 - 4   default 1
+			// 0.005 - 0.007 msec
+			if (Brightness != 0.0
+				|| Contrast != 1.0
+				|| Saturation != 1.0
+				|| Gamma != 1.0) {
+				shaders.Adjust(myTextureID, myTextureID,
+					receiver.GetSenderWidth(), receiver.GetSenderHeight(),
+					Brightness, Contrast, Saturation, Gamma);
+			}
+
+			// Sharpness 0 - 4  (default 0)
+			// 0.001 - 0.002 msec
+			if (Sharpness > 0.0) {
+				shaders.Sharpen(myTextureID, myTextureID,
+					receiver.GetSenderWidth(), receiver.GetSenderHeight(),
+					Sharpwidth, Sharpness);
+			}
+
+			// Blur 0 - 4  (default 0)
+			// 0.001 - 0.002 msec
+			if (Blur > 0.0) {
+				shaders.Blur(myTextureID, myTextureID,
+					receiver.GetSenderWidth(), receiver.GetSenderHeight(),
+					Blur);
+			}
+
+			if (bFlip)
+				shaders.Flip(myTextureID, receiver.GetSenderWidth(), receiver.GetSenderHeight());
+			if (bMirror)
+				shaders.Mirror(myTextureID, receiver.GetSenderWidth(), receiver.GetSenderHeight());
+			if (bSwap)
+				shaders.Swap(myTextureID, receiver.GetSenderWidth(), receiver.GetSenderHeight());
+
+		}
+
+		// Add frame to video if recording
 		if (bRecording) {
 			recorder.Write(myTexture.getTextureData().textureID, myTexture.getTextureData().textureTarget, senderWidth, senderHeight);
 			ElapsedRecordingTime = (ElapsedMicroseconds()-StartRecordingTime)/1000000.0; // seconds
@@ -416,6 +503,7 @@ void ofApp::draw() {
 				}
 			}
 		}
+
 	}
 
 	myTexture.draw(0, 0, ofGetWidth(), ofGetHeight());
@@ -536,51 +624,62 @@ void ofApp::draw() {
 	// Show what it's sending
 	if (bShowInfo) {
 
+		std::string str;
 		ofSetColor(255);
-		std::string str = "Sending as : ";
-		str += sender.GetName(); str += " (";
-		str += ofToString(sender.GetWidth()); str += "x";
-		str += ofToString(sender.GetHeight()); str += ") ";
-		// Sender OpenGL texture format description
-		// for 16 bit and floating point types
-		GLint glformat = sender.GLDXformat();
-		if(glformat != GL_RGBA)
-			str += sender.GLformatName(sender.GLDXformat());
-		myFont.drawString(str, 20, 30);
 
-		// Is the sender using CPU sharing?
-		str.clear();
-		if (sender.GetCPUshare()) {
-			str = "CPU share";
+		if (sender.IsInitialized()) {
+
+			str = "Sending as : ";
+			str += sender.GetName(); str += " (";
+			str += ofToString(sender.GetWidth()); str += "x";
+			str += ofToString(sender.GetHeight()); str += ") ";
+			// Sender OpenGL texture format description
+			// for 16 bit and floating point types
+			GLint glformat = sender.GLDXformat();
+			if (glformat != GL_RGBA)
+				str += sender.GLformatName(sender.GLDXformat());
+			myFont.drawString(str, 20, 30);
+
+			// Is the sender using CPU sharing?
+			str.clear();
+			if (sender.GetCPUshare()) {
+				str = "CPU share";
+			}
+			else {
+				str = "Texture share";
+				// Graphics can still be incompatible if the user
+				// did not select "Auto" or "CPU" in SpoutSettings
+				if (!sender.IsGLDXready())
+					str = "(Graphics not compatible)";
+			}
+
+			// Show sender fps and framecount if selected
+			if (sender.GetFrame() > 0) {
+				str = "fps ";
+				// Average to stabilise fps display
+				g_SenderFps = g_SenderFps*.85 + 0.15*sender.GetFps();
+				// Round first or integer cast will truncate to the whole part
+				str += ofToString((int)(round(g_SenderFps)));
+				str += " : frame  ";
+				str += ofToString(sender.GetFrame());
+			}
+			else {
+				// Show Openframeworks fps
+				str = "fps : " + ofToString((int)roundf(ofGetFrameRate()));
+			}
+			str += " ";
+			myFont.drawString(str, 20, 52);
 		}
 		else {
-			str = "Texture share";
-			// Graphics can still be incompatible if the user
-			// did not select "Auto" or "CPU" in SpoutSettings
-			if (!sender.IsGLDXready())
-				str = "(Graphics not compatible)";
+			str = "Could not create sender";
+			myFont.drawString(str, 20, 30);
+			str = "Help About Logs for details";
+			myFont.drawString(str, 20, 52);
 		}
-
-		// Show sender fps and framecount if selected
-		if (sender.GetFrame() > 0) {
-			str = "fps ";
-			// Average to stabilise fps display
-			g_SenderFps = g_SenderFps*.85 + 0.15*sender.GetFps();
-			// Round first or integer cast will truncate to the whole part
-			str += ofToString((int)(round(g_SenderFps)));
-			str += " : frame  ";
-			str += ofToString(sender.GetFrame());
-		}
-		else {
-			// Show Openframeworks fps
-			str = "fps : " + ofToString((int)roundf(ofGetFrameRate()));
-		}
-		str += " ";
-		myFont.drawString(str, 20, 52);
 
 		// Show the keyboard shortcuts
 		str = "Space - hide info";
-		myFont.drawString(str, 10, ofGetHeight() - 20);
+		myFont.drawString(str, 20, ofGetHeight() - 20);
 
 	} // endif show info
 
@@ -727,38 +826,12 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	//
 
 	if (title == "Save image") {
-		if (receiver.IsConnected())
-		{
-			// LJ DEBUG
+		if (receiver.IsConnected()) {
 			std::string name = EnterFileName(2);
 			if (name.empty())
 				return;
-
-			// Add the default extension if none entered
-			std::size_t found = name.find('.');
-			if (found == std::string::npos)
-				name += ".png";
-			ofImage myImage;
-			myTexture.readToPixels(myImage.getPixels());
-			// Save to bin>data
-			myImage.save(name);
-
-			/*
-			char imagename[MAX_PATH];
-			imagename[0] = 0; // No existing name
-			if (EnterSenderName(imagename, "Enter image name and extension")) {
-				std::string name = imagename;
-				// Ad an extension if none entered
-				std::size_t found = name.find('.');
-				if (found == std::string::npos)
-					name += ".png";
-				ofImage myImage;
-				myTexture.readToPixels(myImage.getPixels());
-				// Save to bin>data
-				myImage.save(name);
-			}
-			*/
-
+			printf("Save Image [%s] - glFormat = 0x%X\n", name.c_str(), glFormat);
+			SaveImageFile(name);
 		}
 		else {
 			SpoutMessageBox(NULL, "No sender", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 1400);
@@ -793,41 +866,15 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	// Key commands
 	// Snapshot - F12 key
 	if (title == "Capture image") {
-		if (receiver.IsConnected() && !bFullScreen)	{
+		if (receiver.IsConnected() && !bFullScreen) {
 			// Make a timestamped image file name
 			std::string imagename = receiver.GetSenderName();
 			imagename += "_" + ofGetTimestampString() + extension;
-
 			// Save image to bin>data>captures
 			std::string savepath = "captures\\";
 			savepath += imagename;
+			SaveImageFile(savepath);
 
-			// Get pixels from received texture
-			// Sender texture format determines image type
-			// 16 or 8 bit depth, png or tif
-			// The application texture format is set in ReceiveTexture/IsUpdated
-			if (glFormat == GL_RGBA16
-				|| glFormat == GL_RGBA16F
-				|| glFormat == GL_RGBA32F) {
-				ofShortImage myImage; // Bit depth 16 bits
-				myTexture.readToPixels(myImage.getPixels());
-				myImage.save(savepath); // save png or tif
-			}
-			else if (glFormat == GL_RGBA) {
-				ofImage myImage; // Bit depth 8 bits
-				myTexture.readToPixels(myImage.getPixels());
-				myImage.save(savepath); // save png or tif
-			}
-			else {
-				SpoutMessageBox(NULL, "Unsupported format", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2000);
-				return;
-			}
-			if (bShowFile) {
-				SpoutMessageBox(NULL, imagename.c_str(), "Saved image", MB_OK | MB_ICONINFORMATION | MB_TOPMOST, 2500); // 2.5 second timeout
-			}
-			else {
-				SpoutMessageBox(NULL, imagename.c_str(), "Saved image", MB_OK | MB_TOPMOST, 1000); // Brief, silent popup
-			}
 		}
 		else {
 			SpoutMessageBox(NULL, "No sender\nImage capture not possible", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2000);
@@ -919,6 +966,8 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 	// Help menu
 	//
 #ifdef BUILDRECEIVER
+
+	// Capture/recording options
 	if (title == "Options") {
 
 		old_extension = extension;
@@ -930,6 +979,7 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 		old_codec = codec;
 		old_quality = quality;
 		old_preset = preset;
+		old_imagetype = imagetype;
 
 		if (!DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_OPTIONSBOX), g_hWnd, Options)) {
 			extension = old_extension;
@@ -941,12 +991,140 @@ void ofApp::appMenuFunction(string title, bool bChecked) {
 			codec = old_codec;
 			quality = old_quality;
 			preset = old_preset;
+			imagetype = old_imagetype;
+		}
+	}
+
+	// Image adjustment
+	if (title == "Adjust") {
+
+		if (!(glFormat == GL_RGBA || glFormat == GL_RGBA8)) {
+			std::string str ="8 bit RGBA textures are required for image adjustment.\n";
+			str += "Sender format is ";
+			str += receiver.GLformatName(receiver.GLDXformat());
+			SpoutMessageBox(NULL, str.c_str(), "Incompatible texture format", MB_OK | MB_ICONWARNING | MB_TOPMOST);
+		}
+		else {
+			if (!hwndAdjust) {
+				OldBrightness = Brightness;
+				OldContrast   = Contrast;
+				OldSaturation = Saturation;
+				OldGamma      = Gamma;
+				OldSharpness  = Sharpness;
+				OldSharpwidth = Sharpwidth;
+				OldBlur       = Blur;
+				OldFlip       = bFlip;
+				OldMirror     = bMirror;
+				OldSwap       = bSwap;
+				hwndAdjust = CreateDialogA(g_hInstance, MAKEINTRESOURCEA(IDD_ADJUSTBOX), g_hWnd, (DLGPROC)UserAdjust);
+			}
+			else {
+				SendMessageA(hwndAdjust, WM_DESTROY, 0, 0L);
+				hwndAdjust = NULL;
+			}
 		}
 	}
 #endif
 
 	if (title == "About") {
-		DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_ABOUTBOX), g_hWnd, About);
+		
+		// About using SpoutMessageBox instead of dialog
+		// to avoid the overhead of a dialog and message handler
+		std::vector<string>lines;
+		std::string line;
+
+		line = "Spout demo program\n";
+		lines.push_back(line);
+		line = "Version ";
+
+		// Get product version number
+		char tmp[MAX_PATH]{};
+		if (GetModuleFileNameA(g_hInstance, tmp, MAX_PATH)) {
+			DWORD dummy = 0;
+			DWORD dwSize = GetFileVersionInfoSizeA(tmp, &dummy);
+			if (dwSize > 0) {
+				vector<BYTE> data(dwSize);
+				if (GetFileVersionInfoA(tmp, NULL, dwSize, &data[0])) {
+					LPVOID pvProductVersion = NULL;
+					unsigned int iProductVersionLen = 0;
+					if (VerQueryValueA(&data[0], ("\\StringFileInfo\\080904E4\\ProductVersion"), &pvProductVersion, &iProductVersionLen)) {
+						sprintf_s(tmp, MAX_PATH, "%s\n", (char*)pvProductVersion);
+						line += tmp;
+					}
+				}
+			}
+		}
+		lines.push_back(line);
+
+		// Get the Spout version
+		// Set by Spout Installer (2005, 2006, etc.) 
+		// or by SpoutSettings for 2.007 and later
+		spoutVersion = 0;
+		DWORD dwVersion = 0;
+		if (ReadDwordFromRegistry(HKEY_CURRENT_USER, "Software\\Leading Edge\\Spout", "Version", &dwVersion)) {
+			spoutVersion = (int)dwVersion;
+		}
+		if (spoutVersion == 0) {
+			sprintf_s(tmp, 256, "Spout 2.004 or earlier\n");
+			line = tmp;
+		}
+		else if (spoutVersion <= 2007) {
+			sprintf_s(tmp, 256, "Spout 2.00%1d\n", (spoutVersion - 2000));
+			line = tmp;
+		}
+		else {
+			// Contains major, minor and release - e.g. 2007009
+			// Use Spout SDK version string insted - e.g. 2.007.009
+			line = "Spout  ";
+			line += GetSDKversion().c_str();
+			line += "\n";
+		}
+		lines.push_back(line);
+
+		// Graphics adapter index and name retreived above
+		sprintf_s(tmp, MAX_PATH, "%s\n", adapterName);
+		lines.push_back(tmp);
+
+		// Empty line
+		line = " \n";
+		lines.push_back(line);
+
+		line = "<a href=\"http://spout.zeal.co/\">http://spout.zeal.co/</a>\n";
+		lines.push_back(line);
+
+		// Pad lines to centre
+		// No way to calculate the spaces required
+		// for padding due to proportional font
+		int i = 0;
+#ifdef BUILDRECEIVER
+		for (i=0; i<18; i++) lines[0]=" "+lines[0];
+		for (i=0; i<25; i++) lines[1]=" "+lines[1];
+		for (i=0; i<22; i++) lines[2]=" "+lines[2];
+		for (i=0; i<16; i++) lines[3]=" "+lines[3];
+		for (i=0; i<10; i++) lines[4]=" "+lines[4];
+		for (i=0; i<19; i++) lines[5]=" "+lines[5];
+#else
+		// 15 more for sender - unknown reason
+		for (i=0; i<33; i++) lines[0]=" "+lines[0];
+		for (i=0; i<40; i++) lines[1]=" "+lines[1];
+		for (i=0; i<37; i++) lines[2]=" "+lines[2];
+		for (i=0; i<31; i++) lines[3]=" "+lines[3];
+		for (i=0; i<10; i++) lines[4]=" "+lines[4];
+		for (i=0; i<34; i++) lines[5]=" "+lines[5];
+#endif
+		// Empty lines at bottom
+		line = " \n\n";
+		lines.push_back(line);
+
+		// Construct string
+		std::string str;
+		for (i = 0; i<(int)lines.size(); i++)
+			str += lines[i];
+
+		SpoutMessageBoxButton(1000, L"Logs");
+		if (SpoutMessageBox(NULL, str.c_str(), "About", MB_OK | MB_USERICON | MB_USERBUTTON | MB_TOPMOST) == 1000) {
+			OpenSpoutLogs();
+		}
 	}
 
 } // end appMenuFunction
@@ -1010,7 +1188,6 @@ void ofApp::doFullScreen(bool bEnable, bool bPreviewMode)
 		GetWindowRect(g_hWnd, &windowRect);
 		GetClientRect(g_hWnd, &clientRect);
 
-
 		// Remove caption and borders
 		g_dwStyle = GetWindowLongPtrA(g_hWnd, GWL_STYLE);
 		SetWindowLongPtrA(g_hWnd, GWL_STYLE, WS_VISIBLE); // no other styles but visible
@@ -1050,12 +1227,10 @@ void ofApp::doFullScreen(bool bEnable, bool bPreviewMode)
 			h = (int)(mi.rcMonitor.bottom - mi.rcMonitor.top);
 		}
 
-		// Hide the window while re-sizing to avoid a flash effect
-		ShowWindow(g_hWnd, SW_HIDE);
-
 		// For reasons unknown, rendering is slow if the window is resized
 		// to the monitor extents. Making it 1 pixel larger seems to fix it.
-		SetWindowPos(g_hWnd, HWND_TOPMOST, x-1, y-1, w+2, h+2, SWP_SHOWWINDOW);
+		// Hide the window while re-sizing to avoid a flash effect
+		SetWindowPos(g_hWnd, HWND_TOPMOST, x-1, y-1, w+2, h+2, SWP_HIDEWINDOW | SWP_NOREDRAW);
 
 		ShowCursor(FALSE);
 
@@ -1172,6 +1347,7 @@ void ofApp::StopRecording()
 			msgstr += "system audio";
 		else
 			msgstr += "no audio\n";
+
 		if (bShowFile)
 			SpoutMessageBox(NULL, msgstr.c_str(), "Saved video file", MB_OK | MB_ICONINFORMATION, 3000);
 		else
@@ -1228,13 +1404,22 @@ std::string ofApp::EnterFileName(int type)
 	else if (type == 1)
 		ofn.lpstrFilter = "Matroska (*.mkv)\0*.mkv\0Mpeg-4 (*.mp4)\0*.mp4\0Audio Video Interleave (*.avi)\0*.avi\0Quicktime (*.mov)\0*.mov\0All files (*.*)\0*.*\0";
 	else {
+		// Image types supported by Freeimage
+		// .png, .tif, .jpg, .bmp, .hdr
 		// Other image types supported by Openframeworks
-		// .bmp, .jpg, .pcx, .pgm, .png, .ppm, .tga, .tif, .gif, 
-		if(extension == ".tif")
-			ofn.lpstrFilter = "Tif image (*.tif)\0*.tif\0Png image (*.png)\0*.png\0Jpg image(*.jpg)\0*.jpg\0Bmp image (*.bmp)\0*.bmp\0Tga image(*.tga)\0*.tga\0Gif image (*.gif)\0*.gif\0All files (*.*)\0*.*\0";
+		// .pcx, .pgm, .ppm, .tga, .gif, 
+		if (extension == ".jpg")
+			ofn.lpstrFilter = "JPG (JPEG file interchange format)\0*.jpg\0PNG (Portable Network Graphics)\0*.png\0TIF (Tagged Image File Format)\0*.tif\0BMP (Windows bitmap)\0*.bmp\0HDR (High Dynamic Range image)\0*.hdr\0All files (*.*)\0*.*\0";
+		else if (extension == ".bmp")
+			ofn.lpstrFilter = "BMP (Windows bitmap)\0*.bmp\0PNG (Portable Network Graphics)\0*.png\0Tiff (Tagged Image File Format)\0*.tif\0JPG (JPEG file interchange format)\0*.jpg\0HDR (High Dynamic Range image)\0*.hdr\0All files (*.*)\0*.*\0";
+		else if (extension == ".tif")
+			ofn.lpstrFilter = "TIF (Tagged Image File Format)\0*.tif\0PNG (Portable Network Graphics)\0*.png\0JPG (JPEG file interchange format)\0*.jpg\0BMP (Windows bitmap)\0*.bmp\0HDR (High Dynamic Range image)\0*.hdr\0All files (*.*)\0*.*\0";
+		else if (extension == ".hdr")
+			ofn.lpstrFilter = "HDR (High Dynamic Range image)\0*.hdr\0PNG (Portable Network Graphics)\0*.png\0TIF (Tagged Image File Format)\0*.tif\0JPG (JPEG file interchange format)\0*.jpg\0BMP (Windows bitmap)\0*.bmp\0All files (*.*)\0*.*\0";
 		else
-			ofn.lpstrFilter = "Png image (*.png)\0*.png\0Tif image (*.tif)\0*.tif\0Jpg image(*.jpg)\0*.jpg\0Bmp image (*.bmp)\0*.bmp\0Tga image(*.tga)\0*.tga\0Gif image (*.gif)\0*.gif\0All files (*.*)\0*.*\0";
+			ofn.lpstrFilter = "PNG (Portable Network Graphics)\0*.png\0TIF (Tagged Image File Format)\0*.tif\0JPG (JPEG file interchange format)\0*.jpg\0BMP (Windows bitmap)\0*.bmp\0HDR (High Dynamic Range image)\0*.hdr\0All files (*.*)\0*.*\0";
 	}
+
 	ofn.lpstrDefExt = "";
 	// OFN_OVERWRITEPROMPT prompts for over-write
 	ofn.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
@@ -1247,6 +1432,169 @@ std::string ofApp::EnterFileName(int type)
 	// User file name entry
 	return filePath;
 }
+
+bool ofApp::ConfirmFileSave(std::string savepath)
+{
+	if (_access(savepath.c_str(), 0) != -1) {
+		char name[MAX_PATH]{};
+		strcpy_s(name, MAX_PATH, savepath.c_str());
+		PathStripPathA(name);
+		std::string message = name;
+		message += " already exists\nDo you want to replace it?";
+		if (SpoutMessageBox(NULL, message.c_str(), "Confirm file save", MB_YESNO | MB_ICONWARNING | MB_TOPMOST) != IDYES)
+			return false;
+	}
+	return true;
+}
+
+//--------------------------------------------------------------
+void ofApp::SaveImageFile(std::string name, bool bInvert)
+{
+	// Add the default extension if none entered
+	std::size_t pos = name.rfind('.');
+	if (pos == std::string::npos)
+		name += ".png";
+
+	// hdr image
+	if (name.substr(pos) == ".hdr" && !(glFormat == GL_RGBA32F || glFormat == GL_RGBA16F)) {
+		std::string str ="High dynamic range (hdr) images\nrequire floating point textures.\n";
+		str += "Sender format is ";
+		str += receiver.GLformatName(receiver.GLDXformat());
+		str += "\nSelect a different image type.";
+		SpoutMessageBox(NULL, str.c_str(),
+			"Incorrect image type", MB_OK | MB_ICONWARNING | MB_TOPMOST);
+		return;
+	}
+
+	// Get pixels from received texture
+	// Sender texture format determines image type, 16 or 8 bit depth float or unsigned
+	// The format is found in ReceiveTexture/IsUpdated and displayed on-screen
+	if (glFormat == GL_RGBA32F) {
+		// HDR format
+		// see: https://booksite.elsevier.com/samplechapters/9780123749147/02~Chapter_3.pdf
+		size_t pos = name.rfind(".");
+		if (name.substr(pos) != ".hdr") {
+			SpoutMessageBox(NULL, "High dynamic range format is required\nfor 32 bit floating point textures.\n\
+					Change to HDR image type.", "Incorrect image type", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2500);
+			return;
+		}
+		if (!ConfirmFileSave(name))
+			return;
+
+		// STB RGB float HDR
+		unsigned int width = (unsigned int)myTexture.getWidth();
+		unsigned int height = (unsigned int)myTexture.getHeight();
+		float* fbuffer = new float[width*height*3];
+		ReadTextureData(myTexture.getTextureData().textureID,
+			myTexture.getTextureData().textureTarget,
+			width, height, fbuffer, glFormat, 3);
+		stbi_write_hdr(name.c_str(), width, height, 3, fbuffer);
+		delete[] fbuffer;
+
+	}
+	else if (glFormat == GL_RGBA16F) {
+		// 16 bit RGBA float - tif and hdr
+		size_t pos = name.rfind(".");
+		if (!(name.substr(pos) == ".tif" || name.substr(pos) == ".hdr")) {
+			SpoutMessageBox(NULL, "TIF or HDR are the only image formats\nsupported for 16 bit float textures\n\
+					Change to TIF or HDR image type.", "Incorrect file type", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2500);
+			return;
+		}
+		if (!ConfirmFileSave(name))
+			return;
+		if (name.substr(pos) == ".hdr") {
+			// STB RGB float HDR
+			unsigned int width = (unsigned int)myTexture.getWidth();
+			unsigned int height = (unsigned int)myTexture.getHeight();
+			float* fbuffer = new float[width*height*3];
+			ReadTextureData(myTexture.getTextureData().textureID,
+				myTexture.getTextureData().textureTarget,
+				width, height, fbuffer, glFormat, 3);
+			stbi_write_hdr(name.c_str(), width, height, 3, fbuffer);
+			delete[] fbuffer;
+		}
+		else {
+			// Freeimage rgba tif
+			ofFloatImage myImage; // Float pixels
+			myTexture.readToPixels(myImage.getPixels());
+			myImage.save(name); // save png or tif
+		}
+	}
+	else if (glFormat == GL_RGBA16) {
+		// TIF and PNG supported
+		// 16 bit RGBA - png or tif
+		size_t pos = name.rfind(".");
+		if (!(name.substr(pos) == ".tif" || name.substr(pos) == ".png")) {
+			SpoutMessageBox(NULL, "PNG or TIF are the only image formats supported for 16 bit unsigned textures\n\
+					Change to PNG or TIF image type.", "Incorrect image type", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2500);
+			return;
+		}
+		if (!ConfirmFileSave(name))
+			return;
+		ofShortImage myImage; // Bit depth 16 bits
+		myTexture.readToPixels(myImage.getPixels());
+		myImage.save(name); // save png or tif
+	}
+	else if (glFormat == GL_RGBA || glFormat == GL_RGBA8) {
+		// 8 bit rgba - png, tif, jpg, bmp
+		size_t pos = name.rfind(".");
+		if (name.substr(pos) == ".tif" || name.substr(pos) == ".png"
+			|| name.substr(pos) == ".jpg" || name.substr(pos) == ".bmp") {
+			if (!ConfirmFileSave(name))
+				return;
+			ofImage myImage; // Bit depth 8 bits
+			myTexture.readToPixels(myImage.getPixels());
+			myImage.save(name); // save tif, png, jpg, bmp
+		}
+	}
+	else {
+		std::string str ="Sender format [";
+		str += receiver.GLformatName(receiver.GLDXformat());
+		str += "] not supported";
+		SpoutMessageBox(NULL, str.c_str(), "Incompatible format", MB_OK | MB_ICONWARNING | MB_TOPMOST);
+		return;
+	}
+
+	char imagename[MAX_PATH]={};
+	strcpy_s(imagename, MAX_PATH, name.c_str());
+	PathStripPathA(imagename);
+	if (bShowFile)
+		SpoutMessageBox(NULL, imagename, "Saved image", MB_OK | MB_ICONINFORMATION | MB_TOPMOST, 2500);
+	else
+		SpoutMessageBox(NULL, imagename, "Saved image", MB_OK | MB_USERICON | MB_TOPMOST, 1000);
+
+}
+
+
+// Read texture pixels
+bool ofApp::ReadTextureData(GLuint SourceID, GLuint SourceTarget,
+	unsigned int width, unsigned int height, void* dest,
+	GLenum GLformat, int nChannels)
+{
+	if (glFormat == GL_RGBA16F || glFormat == GL_RGBA32F) {
+		glBindTexture(SourceTarget, SourceID);
+		// RGB data for float hdr images
+		if (nChannels == 3)
+			glGetTexImage(SourceTarget, 0, GL_RGB, GL_FLOAT, dest);
+		else
+			glGetTexImage(SourceTarget, 0, GL_RGBA, GL_FLOAT, dest);
+		glBindTexture(SourceTarget, 0);
+	}
+	else if (glFormat == GL_RGBA16) { // Bit depth 16 bits
+		glBindTexture(SourceTarget, SourceID);
+		glGetTexImage(SourceTarget, 0, GL_RGBA, GL_UNSIGNED_SHORT, dest);
+		glBindTexture(SourceTarget, 0);
+	}
+	else {
+		// Dest must be RGBA or RGB width x height
+		glBindTexture(SourceTarget, SourceID);
+		glGetTexImage(SourceTarget, 0, GL_RGBA, GL_UNSIGNED_BYTE, dest);
+		glBindTexture(SourceTarget, 0);
+	}
+
+	return true;
+}
+
 
 
 //--------------------------------------------------------------
@@ -1261,18 +1609,15 @@ void ofApp::WriteInitFile(const char* initfile)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".tif", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".png", (LPCSTR)initfile);
-	
 	// Recording options
 	if (bPrompt)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"1", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"0", (LPCSTR)initfile);
-
 	if (bShowFile)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Showfile", (LPCSTR)"1", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Showfile", (LPCSTR)"0", (LPCSTR)initfile);
-
 	if (bDuration)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Duration", (LPCSTR)"1", (LPCSTR)initfile);
 	else
@@ -1285,12 +1630,10 @@ void ofApp::WriteInitFile(const char* initfile)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"1", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"0", (LPCSTR)initfile);
-
 	if (codec == 1)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"1", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"0", (LPCSTR)initfile);
-
 	if (quality == 0)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"0", (LPCSTR)initfile);
 	else if (quality == 1)
@@ -1300,6 +1643,36 @@ void ofApp::WriteInitFile(const char* initfile)
 
 	sprintf_s(tmp, MAX_PATH, "%d", preset);
 	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Preset", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%d", imagetype);
+	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)tmp, (LPCSTR)initfile);
+
+	// Image adjustment
+	sprintf_s(tmp, MAX_PATH, "%.3f", Brightness);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Brightness", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Contrast);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Contrast", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Saturation);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Saturation", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Gamma);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Gamma", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Blur);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Blur", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpness);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Sharpness", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpwidth);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Sharpwidth", (LPCSTR)tmp, (LPCSTR)initfile);
+	if (bFlip)
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Flip", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Flip", (LPCSTR)"0", (LPCSTR)initfile);
+	if (bMirror)
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Mirror", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Mirror", (LPCSTR)"0", (LPCSTR)initfile);
+	if (bSwap)
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Swap", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Swap", (LPCSTR)"0", (LPCSTR)initfile);
 
 	// Menu options
 	if (bShowInfo)
@@ -1324,7 +1697,8 @@ void ofApp::ReadInitFile(const char* initfile)
 	// Capture options
 	extension = ".png";
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Imagetype", NULL, (LPSTR)tmp, 5, initfile);
-	if (tmp[0]) extension = tmp;
+	if (tmp[0]) imagetype = atoi(tmp);
+	extension = imagetypes[imagetype];
 	
 	// Recording options
 	bPrompt = false; bShowFile = false; bDuration=false; SecondsDuration=0L;
@@ -1346,6 +1720,30 @@ void ofApp::ReadInitFile(const char* initfile)
 	if (tmp[0]) quality = atoi(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Preset", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) preset = atoi(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Imagetype", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) imagetype = atoi(tmp);
+
+	// Image dajustment
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Brightness", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Brightness = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Contrast", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Contrast = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Saturation", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Saturation = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Gamma", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Gamma = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Blur", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Blur = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpness", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Sharpness = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpwidth", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Sharpwidth = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"bFlip", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bFlip = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"bMirror", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bMirror = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"bSwap", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bSwap = (atoi(tmp) == 1);
 
 	// Menu options
 	bShowInfo = true; bTopmost = false;
@@ -1438,26 +1836,36 @@ INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 }
 
 #ifdef BUILDRECEIVER
-// Message handler for options
+
+// Message handler for capture and recording options
 INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
 	HWND hwndList = NULL;
-	HWND hwndUpDnCtl = NULL;
-	UINT nCode = 0;
-	int count = 0;
-	LPNMUPDOWN lpnmud={0};
 	char tmp[256]={0};
 	char presets[4][128] ={ "Ultrafast", "Superfast", "Veryfast", "Faster" };
+	// imagetypes is static
+
 
 	switch (message) {
 
 	case WM_INITDIALOG:
 		{
+			// Image type
+			hwndList = GetDlgItem(hDlg, IDC_IMAGE_TYPE);
+			SendMessageA(hwndList, (UINT)CB_RESETCONTENT, 0, 0L);
+			for (int k = 0; k < 5; k++)
+				SendMessageA(hwndList, (UINT)CB_ADDSTRING, 0, (LPARAM)imagetypes[k]);
+			imagetypeindex = imagetype;
+			SendMessageA(hwndList, CB_SETCURSEL, (WPARAM)imagetypeindex, (LPARAM)0);
+
+			/*
 			// Capture type - png/tif
 			int iPos = 0;
 			if (extension == ".tif") iPos = 1; // 0-png, 1-tif
 			CheckRadioButton(hDlg, IDC_PNG, IDC_TIF, IDC_PNG+iPos);
+			*/
+
 			// File name entry prompt
 			CheckDlgButton(hDlg, IDC_PROMPT, (UINT)bPrompt);
 			// Show file details
@@ -1473,6 +1881,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			SetDlgItemTextA(hDlg, IDC_SECONDS, (LPCSTR)tmp);
 			// Quality
 			CheckRadioButton(hDlg, IDC_QLOW, IDC_QHIGH, IDC_QLOW+(int)quality);
+
 			// Presets
 			hwndList = GetDlgItem(hDlg, IDC_PRESET);
 			SendMessageA(hwndList, (UINT)CB_RESETCONTENT, 0, 0L);
@@ -1480,6 +1889,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				SendMessageA(hwndList, (UINT)CB_ADDSTRING, 0, (LPARAM)presets[k]);
 			presetindex = preset;
 			SendMessageA(hwndList, CB_SETCURSEL, (WPARAM)presetindex, (LPARAM)0);
+
 			// Disable h264 options for mpeg4
 			if (codec == 0) {
 				// Quality
@@ -1496,6 +1906,9 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 		// Combo box selection
 		if (HIWORD(wParam) == CBN_SELCHANGE) {
+			if ((HWND)lParam == GetDlgItem(hDlg, IDC_IMAGE_TYPE)) {
+				imagetypeindex = static_cast<unsigned int>(SendMessageA((HWND)lParam, (UINT)CB_GETCURSEL, (WPARAM)0, (LPARAM)0));
+			}
 			if ((HWND)lParam == GetDlgItem(hDlg, IDC_PRESET)) {
 				presetindex = static_cast<unsigned int>(SendMessageA((HWND)lParam, (UINT)CB_GETCURSEL, (WPARAM)0, (LPARAM)0));
 			}
@@ -1520,13 +1933,21 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 		case IDC_OPTIONS_HELP:
 			{
-				std::string str = "Image type\n";
-				str += "Tif images, instead of default png, ";
-				str += "may be useful if the sender is producing 16 bit textures. ";
+				std::string str = "Image type\nImages of several types can be saved depending on the received texture format.\n";
+				str += "8 bit unsigned, 16 bit unsigned, 16 bit float or 32 bit float.\n";
+				str += "<a href=\"https://paulbourke.net/dataformats/pic/index.html\">High dynamic range</a> images can be saved for float textures ";
+				str += "and <a href=\"https://sourceforge.net/projects/qtpfsgui/\">tone mapping</a> applied.\n";
+				str += "   o High dynamic range format (hdr) is required for 32 bit floating point textures.\n";
+				str += "   o Tif or Hdr are the only formats supported for 16 bit float textures.\n";
+				str += "   o Png or Tif are the only formats supported for 16 bit unsigned textures.\n";
+				str += "   o All formats other than Hdr are supported for 8 bit unsigned textures.\n";
 				str += "The texture format is shown by the on-screen display or more details in the \"SpoutPanel\" sender selection dialog.\n\n";
-				
-				str += "File save\nOpen a file save dialog before recording.\nBy default, a file with the sender name is saved in \"data\\videos\" and over-written if it exists.\n\n";
-				str += "File name\nShow file details after recording a video or saving an image.\nBy default, a silent message opens briefly.\n\n";
+
+				str += "File save\nOpen a file save dialog before recording video using F1. ";
+				str += "For immediate recording, a file with the sender name ";
+				str += "is saved in \"data\\videos\" and over-written if it exists\n\n";
+
+				str += "Details\nShow file details after recording a video or saving an image.\n\n";
 
 				str += "Duration\nRecord for a fixed amount of time.\n";
 				str += "Seconds - the time to record in seconds.\n\n";
@@ -1573,12 +1994,12 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			codec = 0;
 			quality = 1;
 			preset = 0;
+			imagetype = 0;
 			SendMessage(hDlg, WM_INITDIALOG, 0, 0L);
 		}
 		break;
 
 		case IDOK:
-			extension = ".png";
 			bPrompt = false;
 			bShowFile = false;
 			bDuration = false;
@@ -1587,8 +2008,11 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			codec = 0;
 			quality = 1;
 			preset = 0;
+			imagetype = 0;
+			/*
 			if (IsDlgButtonChecked(hDlg, IDC_TIF) == BST_CHECKED)
 				extension = ".tif";
+			*/
 			if (IsDlgButtonChecked(hDlg, IDC_PROMPT) == BST_CHECKED)
 				bPrompt = true;
 			if (IsDlgButtonChecked(hDlg, IDC_SHOWFILE) == BST_CHECKED)
@@ -1606,6 +2030,8 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			if (IsDlgButtonChecked(hDlg, IDC_QHIGH) == BST_CHECKED)
 				quality = 2;
 			preset = presetindex;
+			imagetype = imagetypeindex;
+			extension = imagetypes[imagetype];
 			EndDialog(hDlg, 1);
 			break;
 
@@ -1621,102 +2047,250 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	return (INT_PTR)FALSE;
 }
-#endif
 
 
-// Message handler for About box
-INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+
+//
+// Message handler for Adjustment options dialog
+//
+LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	UNREFERENCED_PARAMETER(lParam);
-	char tmp[MAX_PATH]={};
-	char about[1024]={};
-	DWORD dummy = 0;
-	DWORD dwSize = 0;
-	DWORD dwVersion = 0;
-	LPDRAWITEMSTRUCT lpdis;
-	HWND hwnd = NULL;
-	HCURSOR cursorHand = NULL;
-	HINSTANCE hInstance = GetModuleHandle(NULL);
+	char str1[MAX_PATH]={};
+	HWND hBar = NULL;
+	LRESULT iPos = 0;
+	float fValue = 0.0f;
 
 	switch (message) {
 
 	case WM_INITDIALOG:
 
-		sprintf_s(about, 256, "Spout demo program\r\nVersion ");
-		// Get product version number
-		if (GetModuleFileNameA(hInstance, tmp, MAX_PATH)) {
-			dwSize = GetFileVersionInfoSizeA(tmp, &dummy);
-			if (dwSize > 0) {
-				vector<BYTE> data(dwSize);
-				if (GetFileVersionInfoA(tmp, NULL, dwSize, &data[0])) {
-					LPVOID pvProductVersion = NULL;
-					unsigned int iProductVersionLen = 0;
-					if (VerQueryValueA(&data[0], ("\\StringFileInfo\\080904E4\\ProductVersion"), &pvProductVersion, &iProductVersionLen)) {
-						sprintf_s(tmp, MAX_PATH, "%s\r\n", (char *)pvProductVersion);
-						strcat_s(about, 1024, tmp);
-					}
-				}
-			}
-		}
+		// Set the scroll bar limits and text
 
-		// Get the Spout version
-		// Set by Spout Installer (2005, 2006, etc.) 
-		// or by SpoutSettings for 2.007 and later
-		spoutVersion = 0;
-		if (ReadDwordFromRegistry(HKEY_CURRENT_USER, "Software\\Leading Edge\\Spout", "Version", &dwVersion)) {
-			spoutVersion = (int)dwVersion;
-		}
+		// Brightness  -1 - 0 - 1 default 0
+		// Range 2 Brightness*400 - 200
+		hBar = GetDlgItem(hDlg, IDC_BRIGHTNESS);
+		SendMessage(hBar, TBM_SETRANGEMIN, (WPARAM)1, (LPARAM)0);
+		SendMessage(hBar, TBM_SETRANGEMAX, (WPARAM)1, (LPARAM)400);
+		SendMessage(hBar, TBM_SETPAGESIZE, (WPARAM)1, (LPARAM)20);
+		// -1 > +1   - 0 - 200
+		// pos + 1 * 100
+		iPos = (int)(Brightness+1*200.0f);
+		SendMessage(hBar, TBM_SETPOS, (WPARAM)1, (LPARAM)iPos);
+		sprintf_s(str1, 256, "%.3f", Brightness);
+		SetDlgItemTextA(hDlg, IDC_BRIGHTNESS_TEXT, (LPCSTR)str1);
 
-		if (spoutVersion == 0) {
-			sprintf_s(tmp, 256, "Spout 2.004 or earlier\r\n");
-			strcat_s(about, 1024, tmp);
-		}
-		else if (spoutVersion <= 2007) {
-			sprintf_s(tmp, 256, "Spout 2.00%1d\r\n", (spoutVersion - 2000));
-			strcat_s(about, 1024, tmp);
-		}
-		else {
-			// Contains major, minor and release - e.g. 2007009
-			// Use Spout SDK version string insted - e.g. 2.007.009
-			strcat_s(about, 1024, "Spout  ");
-			strcat_s(about, 1024, GetSDKversion().c_str());
-		}
-		SetDlgItemTextA(hDlg, IDC_ABOUT_TEXT, (LPCSTR)about);
+		hBar = GetDlgItem(hDlg, IDC_CONTRAST);
+		SendMessage(hBar, TBM_SETRANGEMIN, (WPARAM)1, (LPARAM)0);
+		SendMessage(hBar, TBM_SETRANGEMAX, (WPARAM)1, (LPARAM)200);
+		SendMessage(hBar, TBM_SETPAGESIZE, (WPARAM)1, (LPARAM)10);
+		iPos = (int)(Contrast*100.0f);
+		SendMessage(hBar, TBM_SETPOS, (WPARAM)1, (LPARAM)iPos);
+		sprintf_s(str1, 256, "%.3f", Contrast);
+		SetDlgItemTextA(hDlg, IDC_CONTRAST_TEXT, (LPCSTR)str1);
 
-		// Graphics adapter index and name
-		sprintf_s(tmp, MAX_PATH, "%s\r\n", adapterName);
-		SetDlgItemTextA(hDlg, IDC_ADAPTER_TEXT, (LPCSTR)tmp);
+		// 0 > 4  - 0 - 400
+		hBar = GetDlgItem(hDlg, IDC_SATURATION);
+		SendMessage(hBar, TBM_SETRANGEMIN, (WPARAM)1, (LPARAM)0);
+		SendMessage(hBar, TBM_SETRANGEMAX, (WPARAM)1, (LPARAM)400);
+		SendMessage(hBar, TBM_SETPAGESIZE, (WPARAM)1, (LPARAM)10);
+		iPos = (int)(Saturation * 100.0f);
+		SendMessage(hBar, TBM_SETPOS, (WPARAM)1, (LPARAM)iPos);
+		sprintf_s(str1, 256, "%.3f", Saturation);
+		SetDlgItemTextA(hDlg, IDC_SATURATION_TEXT, (LPCSTR)str1);
 
-		// Hyperlink hand cursor
-		cursorHand = LoadCursor(NULL, IDC_HAND);
-		hwnd = GetDlgItem(hDlg, IDC_SPOUT_URL);
-		SetClassLongPtrA(hwnd, GCLP_HCURSOR, (LONG_PTR)cursorHand);
+		hBar = GetDlgItem(hDlg, IDC_GAMMA);
+		SendMessage(hBar, TBM_SETRANGEMIN, (WPARAM)1, (LPARAM)0);
+		SendMessage(hBar, TBM_SETRANGEMAX, (WPARAM)1, (LPARAM)200);
+		SendMessage(hBar, TBM_SETPAGESIZE, (WPARAM)1, (LPARAM)10);
+		iPos = (int)(Gamma * 100.0f);
+		SendMessage(hBar, TBM_SETPOS, (WPARAM)1, (LPARAM)iPos);
+		sprintf_s(str1, 256, "%.3f", Gamma);
+		SetDlgItemTextA(hDlg, IDC_GAMMA_TEXT, (LPCSTR)str1);
+
+		hBar = GetDlgItem(hDlg, IDC_SHARPNESS);
+		SendMessage(hBar, TBM_SETRANGEMIN, (WPARAM)1, (LPARAM)0);
+		SendMessage(hBar, TBM_SETRANGEMAX, (WPARAM)1, (LPARAM)400);
+		SendMessage(hBar, TBM_SETPAGESIZE, (WPARAM)1, (LPARAM)10);
+		iPos = (int)(Sharpness * 100.0f);
+		SendMessage(hBar, TBM_SETPOS, (WPARAM)1, (LPARAM)iPos);
+		sprintf_s(str1, 256, "%.3f", Sharpness);
+		SetDlgItemTextA(hDlg, IDC_SHARPNESS_TEXT, (LPCSTR)str1);
+
+		hBar = GetDlgItem(hDlg, IDC_BLUR);
+		SendMessage(hBar, TBM_SETRANGEMIN, (WPARAM)1, (LPARAM)0);
+		SendMessage(hBar, TBM_SETRANGEMAX, (WPARAM)1, (LPARAM)400);
+		SendMessage(hBar, TBM_SETPAGESIZE, (WPARAM)1, (LPARAM)10);
+		iPos = (int)(Blur * 100.0f);
+		SendMessage(hBar, TBM_SETPOS, (WPARAM)1, (LPARAM)iPos);
+		sprintf_s(str1, 256, "%.3f", Blur);
+		SetDlgItemTextA(hDlg, IDC_BLUR_TEXT, (LPCSTR)str1);
+
+		// Sharpness width radio buttons
+		// 3x3, 5x5, 7x7
+		iPos = ((int)Sharpwidth-3)/2; // 0, 1, 2
+		CheckRadioButton(hDlg, IDC_SHARPNESS_3x3, IDC_SHARPNESS_7x7, IDC_SHARPNESS_3x3+(int)iPos);
+
+		// Option checkboxes
+		if (bFlip)
+			CheckDlgButton(hDlg, IDC_FLIP, BST_CHECKED);
+		else
+			CheckDlgButton(hDlg, IDC_FLIP, BST_UNCHECKED);
+		if (bMirror)
+			CheckDlgButton(hDlg, IDC_MIRROR, BST_CHECKED);
+		else
+			CheckDlgButton(hDlg, IDC_MIRROR, BST_UNCHECKED);
+		if (bSwap)
+			CheckDlgButton(hDlg, IDC_SWAP, BST_CHECKED);
+		else
+			CheckDlgButton(hDlg, IDC_SWAP, BST_UNCHECKED);
+
+		return TRUE;
+
+		// https://msdn.microsoft.com/en-us/library/windows/desktop/hh298416(v=vs.85).aspx
+	case WM_HSCROLL:
+		hBar = (HWND)lParam;
+		if (hBar == GetDlgItem(hDlg, IDC_BRIGHTNESS)) {
+			// 0 - 200 > -1 - +1
+			iPos = SendMessage(hBar, TBM_GETPOS, 0, 0);
+			fValue = ((float)iPos/200.0f)-1.0f;
+			Brightness = fValue;
+			sprintf_s(str1, 256, "%.3f", fValue);
+			SetDlgItemTextA(hDlg, IDC_BRIGHTNESS_TEXT, (LPCSTR)str1);
+		}
+		else if (hBar == GetDlgItem(hDlg, IDC_CONTRAST)) {
+			//  0 - 1 - 4 default 1
+			iPos = SendMessage(hBar, TBM_GETPOS, 0, 0);
+			fValue = ((float)iPos/100.0f);
+			Contrast = fValue;
+			sprintf_s(str1, 256, "%.3f", fValue);
+			SetDlgItemTextA(hDlg, IDC_CONTRAST_TEXT, (LPCSTR)str1);
+		}
+		else if (hBar == GetDlgItem(hDlg, IDC_SATURATION)) {
+			iPos = SendMessage(hBar, TBM_GETPOS, 0, 0);
+			fValue = ((float)iPos)/100.0f;
+			Saturation = fValue;
+			sprintf_s(str1, 256, "%.3f", fValue);
+			SetDlgItemTextA(hDlg, IDC_SATURATION_TEXT, (LPCSTR)str1);
+		}
+		else if (hBar == GetDlgItem(hDlg, IDC_GAMMA)) {
+			iPos = SendMessage(hBar, TBM_GETPOS, 0, 0);
+			fValue = ((float)iPos)/100.0f;
+			Gamma = fValue;
+			sprintf_s(str1, 256, "%.3f", fValue);
+			SetDlgItemTextA(hDlg, IDC_GAMMA_TEXT, (LPCSTR)str1);
+		}
+		else if (hBar == GetDlgItem(hDlg, IDC_SHARPNESS)) {
+			iPos = SendMessage(hBar, TBM_GETPOS, 0, 0);
+			fValue = ((float)iPos)/100.0f;
+			Sharpness = fValue;
+			sprintf_s(str1, 256, "%.3f", fValue);
+			SetDlgItemTextA(hDlg, IDC_SHARPNESS_TEXT, (LPCSTR)str1);
+		}
+		else if (hBar == GetDlgItem(hDlg, IDC_BLUR)) {
+			iPos = SendMessage(hBar, TBM_GETPOS, 0, 0);
+			fValue = ((float)iPos) / 100.0f;
+			Blur = fValue;
+			sprintf_s(str1, 256, "%.3f", fValue);
+			SetDlgItemTextA(hDlg, IDC_BLUR_TEXT, (LPCSTR)str1);
+		}
 		break;
 
-	case WM_DRAWITEM:
-
-		// The blue hyperlink
-		lpdis = (LPDRAWITEMSTRUCT)lParam;
-		if (lpdis->itemID == -1) break;
-		SetTextColor(lpdis->hDC, RGB(6, 69, 173));
-		DrawTextA(lpdis->hDC, "https://spout.zeal.co", -1, &lpdis->rcItem, DT_LEFT);
+	case WM_DESTROY:
+		DestroyWindow(hwndAdjust);
+		hwndAdjust = NULL;
 		break;
 
 	case WM_COMMAND:
+		switch (LOWORD(wParam)) {
 
-		if (LOWORD(wParam) == IDC_SPOUT_URL) {
-			sprintf_s(tmp, MAX_PATH, "http://spout.zeal.co");
-			ShellExecuteA(hDlg, "open", tmp, NULL, NULL, SW_SHOWNORMAL);
-			EndDialog(hDlg, 0);
-			return (INT_PTR)TRUE;
+		case IDC_SHARPNESS_3x3:
+			Sharpwidth = 3.0;
+			break;
+		case IDC_SHARPNESS_5x5:
+			Sharpwidth = 5.0;
+			break;
+		case IDC_SHARPNESS_7x7:
+			Sharpwidth = 7.0;
+			break;
+
+		case IDC_FLIP:
+			if (IsDlgButtonChecked(hDlg, IDC_FLIP) == BST_CHECKED)
+				bFlip = true;
+			else
+				bFlip = false;
+			break;
+
+		case IDC_MIRROR:
+			if (IsDlgButtonChecked(hDlg, IDC_MIRROR) == BST_CHECKED)
+				bMirror = true;
+			else
+				bMirror = false;
+			break;
+
+		case IDC_SWAP:
+			if (IsDlgButtonChecked(hDlg, IDC_SWAP) == BST_CHECKED)
+				bSwap = true;
+			else
+				bSwap = false;
+			break;
+
+		case IDC_RESTORE:
+			Brightness = OldBrightness;
+			Contrast   = OldContrast;
+			Saturation = OldSaturation;
+			Gamma      = OldGamma;
+			Sharpness  = OldSharpness;
+			Sharpwidth = OldSharpwidth;
+			Blur       = OldBlur;
+			bFlip      = OldFlip;
+			bMirror    = OldMirror;
+			bSwap      = OldSwap;
+			SendMessage(hDlg, WM_INITDIALOG, 0, 0L);
+			break;
+
+		case IDC_RESET:
+			Brightness = 0.0; // -1 - 0 - 1 default 0
+			Contrast   = 1.0; //  0 - 1 - 4 default 1
+			Saturation = 1.0; //  0 - 1 - 4 default 1
+			Gamma      = 1.0; //  0 - 1 - 4 default 1
+			Sharpness  = 0.0; //  0 - 4 default 0
+			Sharpwidth = 3.0;
+			Blur       = 0.0;
+			bFlip      = false;
+			bMirror    = false;
+			bSwap      = false;
+			SendMessage(hDlg, WM_INITDIALOG, 0, 0L);
+			break;
+
+		case IDOK:
+			DestroyWindow(hwndAdjust);
+			hwndAdjust = NULL;
+			return TRUE;
+
+		case IDCANCEL:
+			Brightness = OldBrightness;
+			Contrast   = OldContrast;
+			Saturation = OldSaturation;
+			Gamma      = OldGamma;
+			Sharpness  = OldSharpness;
+			Sharpwidth = OldSharpwidth;
+			Blur       = OldBlur;
+			bFlip      = OldFlip;
+			bMirror    = OldMirror;
+			bSwap      = OldSwap;
+			DestroyWindow(hwndAdjust);
+			hwndAdjust = NULL;
+			return TRUE;
+
+		default:
+			return FALSE;
 		}
-
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
-			EndDialog(hDlg, LOWORD(wParam));
-			return (INT_PTR)TRUE;
-		}
-
 		break;
+
 	}
-	return (INT_PTR)FALSE;
+
+	return FALSE;
 }
+
+#endif
+

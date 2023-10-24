@@ -149,11 +149,130 @@ bool spoutRecord::Start(std::string ffmpegPath, std::string OutputFile,
 	// Codec options
 	if (m_FFmpegCodec.empty()) {
 
-		if (m_codec == 1) { // h264
+		// Codec - 0-mpeg4, 1-libx264, 2-h264_nvenc, 3-hevc_nvenc, 4-hap 
+		if (m_codec == 4) { // hap
+
+			// Works but VLC crash and restart
+			// -vcodec hap -format (hap, hap_q, hap_alpha)
+			args += " -vcodec hap";
+
+			// Quality
+			//    0 - low (hap)
+			//    1 - medium (hap_q)
+			//    2 - high (hap_alpha)
+			/*
+			if (m_Quality == 0)
+				args += " -format hap";
+			else if (m_Quality == 1)
+				args += " -format hap_q";
+			else
+				args += " -format hap_alpha";
+			*/
+
+			m_FileExt = "mov";
+
+		}
+		else if (m_codec == 3) { // HEVC_NVENC hardware encode
+
+			// " -vcodec hevc_nvenc -preset llhq -tune ull -pix_fmt yuv444p";
+
+			args += " -vcodec hevc_nvenc";
+
+			// Preset
+			// https://gist.github.com/nico-lab/c2d192cbb793dfd241c1eafeb52a21c3
+			/*
+			p1              12           E..V....... fastest (lowest quality)
+			p2              13           E..V....... faster (lower quality)
+			p3              14           E..V....... fast (low quality)
+			p4              15           E..V....... medium (default)
+			p5              16           E..V....... slow (good quality)
+			p6              17           E..V....... slower (better quality)
+			p7              18           E..V....... slowest (best quality)
+			*/
+			// Quality
+			//    0 - low (p1)
+			//    1 - medium (p4)
+			//    2 - high (p7)
+			if (m_Quality == 0)
+				args += " -preset p1";
+			else if (m_Quality == 1)
+				args += " -preset p4";
+			else
+				args += " -preset p7";
+
+			// TODO args += " -preset llhq"; // low latency hq
+
+			// Tune
+			args += " -tune ull"; // Ultra low latency
+
+			// Output pixel format
+			// Default 4:2:0 - 8 bits
+			args += " -pix_fmt yuv444p"; // 4:4:4 - 8 bits 
+
+			m_FileExt = "mkv";
+
+		}
+		else if (m_codec == 2) { //- h264_nvenc
+
+			// h264-nvenc uses NVidia h264 GPU encoder 
+			args += " -vcodec h264_nvenc";
+
+			// https://gist.github.com/nico-lab/e1ba48c33bf2c7e1d9ffdd9c1b8d0493
+
+			// -preset Set the encoding preset (from 0 to 18) (default p4)
+			// p1 12  fastest (lowest quality)
+			// p2 13  faster(lower quality)
+			// p3 14  fast(low quality)
+			// p4 15  medium(default)
+			// p5 16  slow(good quality)
+			// p6 17  slower(better quality)
+			// p7 18  slowest(best quality)
+
+			// Quality
+			//    0 - low (p1)
+			//    1 - medium (p4)
+			//    2 - high (p7)
+			if (m_Quality == 0)
+				args += " -preset p1";
+			else if (m_Quality == 1)
+				args += " -preset p4";
+			else
+				args += " -preset p7";
+
+			// Tune
+			// -tune Set the encoding tuning info (from 1 to 4) (default hq)
+			// hq       1  High quality
+			// ll       2  Low latency
+			// ull      3  Ultra low latency
+			// lossless 4  Lossless
+
+			args += " -tune ull"; // Ultra low latency
+
+			// -zerolatency  Set 1 to indicate zero latency operation (no reordering delay) (default false)
+			// -rc           Override the preset rate-control (from -1 to INT_MAX) (default -1)
+			// cbr_ld_hq     Constant bitrate low delay high quality mode
+			// cbr_hq        Constant bitrate high quality mode
+			// vbr_hq        Variable bitrate high quality mode
+
+			// -profile  Set the encoding profile (from 0 to 3) (default main)
+			//	baseline   0    4:2:0
+			//	main       1    4:2:0
+			//	high       2    4:2:0
+			//	high444p   3    4:4:4
+
+			args += " -profile high444p"; // 4:4:4
+			// args += " -profile baseline"; // 4:2:0
+
+			// Output pixel format
+			// Default 4:2:0 - 8 bits
+			 args += " -pix_fmt yuv444p"; // 4:4:4 - 8 bits 
+
+			m_FileExt = "mkv";
+		}
+		else if(m_codec == 1) { // libx264
 
 			// Example
 			// " -vcodec libx264 -preset ultrafast -tune zerolatency -crf 23"; // 7,098
-
 			args += " -vcodec libx264";
 
 			// 0 - ultrafast, 1 - superfast, 2 - veryfast, 3 - faster
@@ -179,6 +298,7 @@ bool spoutRecord::Start(std::string ffmpegPath, std::string OutputFile,
 				args += " -crf 23";
 			else
 				args += " -crf 18";
+
 			m_FileExt = "mkv";
 		}
 		else {
@@ -210,7 +330,7 @@ bool spoutRecord::Start(std::string ffmpegPath, std::string OutputFile,
 	str += OutputFile; // Output file full path
 	str += "\""; // Final double quote
 
-	// printf("%s\n", str.c_str());
+	printf("%s\n", str.c_str());
 
 
 	// _popen for FFmpeg will open a console window.

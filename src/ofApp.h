@@ -20,21 +20,21 @@
 */
 #pragma once
 
+// To avoid Openframeworks warning
+#define BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
+
 // Enable this define to create a receiver rather than the default sender
-#define BUILDRECEIVER
+// #define BUILDRECEIVER
 
 #include "ofMain.h"
 #include "resource.h"
-#include "SpoutRecord.h"
 #include "commdlg.h"
 
 #include "Addons\ofxSkybox\ofxSkyBox.h" // Skybox addon
 #include "Addons\ofxWinMenu\ofxWinMenu.h" // Windows menu addon
 #include "..\apps\SpoutGL\Spout.h" // Common for receiver and sender
-
-// For about box graphics adapter display
-static int adapterIndex; // Current graphics adapter index
-static char adapterName[256]; // Current graphics adapter name
+#include "SpoutRecord.h" // FFmpeg recording
+#include "SpoutShaders.h" // Compute shaders
 
 class ofApp : public ofBaseApp{
 	public:
@@ -98,6 +98,12 @@ class ofApp : public ofBaseApp{
 		std::string EnterFileName(int type);
 		void WriteInitFile(const char* initfile);
 		void ReadInitFile(const char* initfile);
+		bool ConfirmFileSave(std::string savepath);
+		void SaveImageFile(std::string savepath, bool bInvert = false);
+		bool ReadTextureData(GLuint SourceID, GLuint SourceTarget,
+			unsigned int width, unsigned int height, void* dest,
+			GLenum GLformat, int nChannels);
+
 #endif
 
 		bool EnterSenderName(char *SenderName, char *caption);
@@ -106,4 +112,12 @@ class ofApp : public ofBaseApp{
 		ofxWinMenu* menu{};
 		ofxSkyBox skybox{};
 		ofEasyCam easycam{};
+
+		// For about box
+		int adapterIndex; // Current graphics adapter index
+		char adapterName[256]; // Current graphics adapter name
+		int spoutVersion = 0;
+		HINSTANCE g_hInstance;
+		HWND g_hWnd;
+
 };

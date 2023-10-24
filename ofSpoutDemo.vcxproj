@@ -179,7 +179,6 @@
     <ClCompile Include="..\SpoutReceiver.cpp" />
     <ClCompile Include="..\SpoutSender.cpp" />
     <ClCompile Include="..\SpoutSenderNames.cpp" />
-    <ClCompile Include="..\SpoutShaders.cpp" />
     <ClCompile Include="..\SpoutSharedMemory.cpp" />
     <ClCompile Include="..\SpoutUtils.cpp" />
     <ClCompile Include="src\Addons\ofxSkybox\ofxCubeMap.cpp" />
@@ -188,6 +187,7 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\ofApp.cpp" />
     <ClCompile Include="src\SpoutRecord.cpp" />
+    <ClCompile Include="src\SpoutShaders.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Spout.h" />
@@ -200,7 +200,6 @@
     <ClInclude Include="..\SpoutReceiver.h" />
     <ClInclude Include="..\SpoutSender.h" />
     <ClInclude Include="..\SpoutSenderNames.h" />
-    <ClInclude Include="..\SpoutShaders.h" />
     <ClInclude Include="..\SpoutSharedMemory.h" />
     <ClInclude Include="..\SpoutUtils.h" />
     <ClInclude Include="src\Addons\ofxSkybox\ofxCubeMap.h" />
@@ -209,6 +208,8 @@
     <ClInclude Include="src\ofApp.h" />
     <ClInclude Include="src\resource.h" />
     <ClInclude Include="src\SpoutRecord.h" />
+    <ClInclude Include="src\SpoutShaders.h" />
+    <ClInclude Include="src\stb_image_write.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\libs\openFrameworksCompiled\project\vs\openframeworksLib.vcxproj">
