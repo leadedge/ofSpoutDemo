@@ -25,22 +25,23 @@ Show or hide the on-screen display.
 
 ### File menu
 * Save image\
-Enter a file name to capture with an extension of the required type (jpg, png, bmp etc). Default folder is bin\data\captures.
+Enter a file name to capture with an extension of the required type (jpg, png, bmp etc).\
+Default folder is "bin\data\captures".
 * Save video\
-Enter a file name to record. Default folder is bin\data\videos.
+Enter a file name to record.\
+Default folder is "bin\data\videos".
 
 ### View menu
 * Adjust\
-Image adjustment
+Live image adjustment
 * Options\
 Opens a dialog with capture and recording options.
-* Image type - png or tif\
-Tif images can be produced instead of default png.
-* Enable\
+* Image type\
+Multiple image types are supported. See "Help" for details.
 * File save\
-Open a "File Save" dialog to select the name and destination folder for the video file.
+Open a "File Save" dialog to select the name and destination folder for the video file for F1 record.
 * File name\
-Show file details after recording a video or saving and image.
+Show file information after video recording or image capture.
 * Duration\
 Record for a fixed amount of time. Enter the number of seconds to record.
 * Audio - record with system audio\
@@ -114,13 +115,13 @@ OPENFRAMEWORKS11\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;images\
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shaders
                  
-Open "ofSpoutDemo.sln" with Visual Studio 2022 and set to "Release"\
+Open "ofSpoutDemo.sln" with Visual Studio 2022 and set to "Release".
  
-The first time you use Openframeworks you have to compile the library\
+The first time you use Openframeworks you have to compile the library.\
 RH click on "openframeworksLib" - Build\
 &nbsp;&nbsp;&nbsp;&nbsp;when it is compiled :\
 RH click on "ofSpoutDemo" - Build\
-&nbsp;&nbsp;&nbsp;&nbsp;ofSpoutDemo.exe will be in the "bin" folder\
+&nbsp;&nbsp;&nbsp;&nbsp;ofSpoutDemo.exe will be in the "bin" folder.\
 Rename it as required. For example : ofSpoutSender.exe or ofSpoutReceiver.exe
 
 ### Build options :
