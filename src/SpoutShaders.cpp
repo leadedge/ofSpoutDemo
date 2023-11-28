@@ -32,6 +32,9 @@
 	17.10.23 - Support float GL formats
 	18.10.23 - SetGLformat - only for compatible GL formats
 	20.10.23 - SetGLformat - add missing GL_RGBA8
+	09.11.23 - Add contrast adaptive sharpen
+	21.11.23 - ComputeShader
+			   Find the maximum number of work group units allowed to limit workgroup size
 
 */
 
@@ -52,10 +55,11 @@ spoutShaders::~spoutShaders() {
 
 	if (m_copyProgram > 0) glDeleteProgram(m_copyProgram);
 	if (m_brcosaProgram > 0) glDeleteProgram(m_brcosaProgram);
-	if (m_sharpenProgram > 0) glDeleteProgram(m_sharpenProgram);
 	if (m_hBlurProgram > 0) glDeleteProgram(m_hBlurProgram);
 	if (m_vBlurProgram > 0) glDeleteProgram(m_vBlurProgram);
-
+	if (m_sharpenProgram > 0) glDeleteProgram(m_sharpenProgram);
+	if (m_casProgram > 0) glDeleteProgram(m_casProgram);
+	if (m_kuwaharaProgram > 0) glDeleteProgram(m_kuwaharaProgram);
 }
 
 //---------------------------------------------------------
@@ -74,7 +78,6 @@ bool spoutShaders::Copy(GLuint SourceID, GLuint DestID,
 	return ComputeShader(m_copystr, m_copyProgram, SourceID, DestID,
 		width, height, bInvert, bSwap);
 }
-
 
 //---------------------------------------------------------
 // Function: Flip
@@ -100,7 +103,6 @@ bool spoutShaders::Swap(GLuint SourceID, unsigned int width, unsigned int height
 	return ComputeShader(m_swapstr, m_swapProgram, SourceID, 0, width, height);
 }
 
-
 //---------------------------------------------------------
 // Function: Adjust
 // Brightness, contrast, saturation, gamma
@@ -118,19 +120,6 @@ bool spoutShaders::Adjust(GLuint SourceID, GLuint DestID,
 }
 
 //---------------------------------------------------------
-// Function: Sharpen
-// Sharpen using unsharp mask
-//     sharpenWidth     - 1 3x3, 2 5x5, 3 7x7
-//     sharpenStrength  - 1 - 3 typical
-bool spoutShaders::Sharpen(GLuint SourceID, GLuint DestID, 
-	unsigned int width, unsigned int height,
-	float sharpenWidth, float sharpenStrength)
-{
-	return ComputeShader(m_sharpenstr, m_sharpenProgram, 
-		SourceID, DestID, width, height, sharpenWidth, sharpenStrength);
-}
-
-//---------------------------------------------------------
 // Function: Blur
 //     Two pass Gaussian blur
 //     amount - 1 - 4 typical
@@ -145,6 +134,53 @@ bool spoutShaders::Blur(GLuint SourceID, GLuint DestID,
 	return false;
 }
 
+//---------------------------------------------------------
+// Function: Sharpen
+// Sharpen using unsharp mask
+//     sharpenWidth     - 1 3x3, 2 5x5, 3 7x7
+//     sharpenStrength  - 1 - 3 typical
+bool spoutShaders::Sharpen(GLuint SourceID, GLuint DestID, 
+	unsigned int width, unsigned int height,
+	float sharpenWidth, float sharpenStrength)
+{
+	return ComputeShader(m_sharpenstr, m_sharpenProgram, 
+		SourceID, DestID,
+		width, height,
+		sharpenWidth, sharpenStrength);
+}
+
+//---------------------------------------------------------
+// Function: AdaptiveSharpen
+// Sharpen using Contrast Adaptive sharpe algorithm
+//     level - 0 > 1
+bool spoutShaders::AdaptiveSharpen(GLuint SourceID,
+	unsigned int width, unsigned int height, float caswidth, float caslevel)
+{
+	return ComputeShader(m_casstr, m_casProgram,
+		SourceID, 0, width, height, caswidth, caslevel);
+}
+
+//---------------------------------------------------------
+// Function: Kuwahara
+//     Kuwahara filter
+//     amount - 1 - 4 typical
+bool spoutShaders::Kuwahara(GLuint SourceID, GLuint DestID, 
+	unsigned int width, unsigned int height, float amount)
+{
+	/*
+	// Load shader from file for debugging
+	if (m_kuwaharastr.empty()) {
+		char exepath[MAX_PATH]={};
+		GetModuleFileNameA(NULL, exepath, MAX_PATH);
+		PathRemoveFileSpecA(exepath);
+		strcat_s(exepath, "\\data\\shaders\\kuwahara.txt");
+		m_kuwaharastr = GetFileString(exepath);
+		// printf("%s\n", m_kuwaharastr.c_str());
+	}
+	*/
+	return ComputeShader(m_kuwaharastr, m_kuwaharaProgram,
+		SourceID, DestID, width, height, amount);
+}
 
 //---------------------------------------------------------
 // Function: SetGLformat
@@ -182,14 +218,18 @@ void spoutShaders::SetGLformat(GLint glformat)
 		// All shaders have to be re-compiled
 		if (m_copyProgram     > 0) glDeleteProgram(m_copyProgram);
 		if (m_brcosaProgram   > 0) glDeleteProgram(m_brcosaProgram);
-		if (m_sharpenProgram  > 0) glDeleteProgram(m_sharpenProgram);
-		if (m_hBlurProgram    > 0) glDeleteProgram(m_hBlurProgram);
 		if (m_vBlurProgram    > 0) glDeleteProgram(m_vBlurProgram);
+		if (m_sharpenProgram  > 0) glDeleteProgram(m_sharpenProgram);
+		if (m_casProgram      > 0) glDeleteProgram(m_casProgram);
+		if (m_hBlurProgram    > 0) glDeleteProgram(m_hBlurProgram);
+		if (m_kuwaharaProgram > 0) glDeleteProgram(m_kuwaharaProgram);
 		m_copyProgram     = 0;
 		m_brcosaProgram   = 0;
 		m_sharpenProgram  = 0;
+		m_casProgram      = 0;
 		m_hBlurProgram    = 0;
 		m_vBlurProgram    = 0;
+		m_kuwaharaProgram = 0;
 
 		// No notice for GL_RGBA -> GL_RGBA8
 		if (glformat != GL_RGBA) {
@@ -206,13 +246,16 @@ void spoutShaders::SetGLformat(GLint glformat)
 // Check shader source for correct format description
 void spoutShaders::CheckShaderFormat(std::string &shaderstr)
 {
-	// Find existing format name "layout(rgba8, etc
+	// Find existing format name "layout(rgba8, ...etc
 	size_t pos1 = shaderstr.find("(");
 	pos1 += 1; // Skip the '(' character
 	size_t pos2 = shaderstr.find(",");
 	std::string formatname = shaderstr.substr(pos1, pos2-pos1);
 
-	// Find matching format name
+	// Default format name is "rbgb8"
+	// SetGLformat establishes m_GLformatName from the OpenGL format
+	// "rgba8" "rgba16" "rgba16f" or "rgba32f" supported
+	// Replace all occurrences of "rgba8" with m_GLformatName
 	if (m_GLformatName != formatname) {
 		// Replace shader format name
 		size_t pos = 0;
@@ -224,8 +267,8 @@ void spoutShaders::CheckShaderFormat(std::string &shaderstr)
 			shaderstr.replace(pos, formatname.length(), m_GLformatName);
 		}
 	}
+	// printf("%s\n", shaderstr.c_str());
 }
-
 
 //---------------------------------------------------------
 // Function: ComputeShader
@@ -240,10 +283,23 @@ bool spoutShaders::ComputeShader(std::string &shaderstr, GLuint &program,
 		return false;
 	}
 
-	// The number of Y and Y work groups should match image width and height
-	// Default size 32x32, adjust for aspect ratio
-	unsigned int nWgX = width / (unsigned int)ceil((float)width / 32.0f);
-	unsigned int nWgY = nWgX * height / width;
+	// Find the maximum number of work group units allowed
+	int workgroups = 0;
+	glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &workgroups);
+	// wgx*wgy must be less that max workgroup invocations
+	unsigned int nWgX = (unsigned int)sqrt((float)workgroups);
+	unsigned int nWgY = nWgX;
+
+	// The X and Y work group sizes should match image width and height
+	// Adjust down for aspect ratio
+	if (width >= height) {
+		nWgX = width/(unsigned int)ceil((float)width/(float)nWgX);
+		nWgY = nWgX * height/width;
+	}
+	else {
+		nWgY = height/(unsigned int)ceil((float)height/(float)nWgY);
+		nWgX = nWgY * width/height;
+	}
 
 	if (program == 0) {
 		// Check shader source for correct format name
@@ -253,6 +309,8 @@ bool spoutShaders::ComputeShader(std::string &shaderstr, GLuint &program,
 			SpoutLogWarning("spoutShaders::ComputeShader - CreateComputeShader failed");
 			return false;
 		}
+		SpoutLogNotice("spoutShaders::ComputeShader - created program (%d)", program);
+
 	}
 
 	glUseProgram(program);
@@ -263,7 +321,7 @@ bool spoutShaders::ComputeShader(std::string &shaderstr, GLuint &program,
 	if (uniform1 != -1.0) glUniform1f(1, uniform1);
 	if (uniform2 != -1.0) glUniform1f(2, uniform2);
 	if (uniform3 != -1.0) glUniform1f(3, uniform3);
-	glDispatchCompute(width / nWgX, height / nWgY, 1);
+	glDispatchCompute(width/nWgX, height/nWgY, 1);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 	glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_READ_WRITE, m_GLformat);
 	glBindImageTexture(1, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, m_GLformat);
@@ -301,7 +359,7 @@ unsigned int spoutShaders::CreateComputeShader(std::string shader, unsigned int 
 	shaderstr += ", local_size_y = ";
 	shaderstr += std::to_string(nWgY);
 	shaderstr += ", local_size_z = 1) in;\n";
-
+	
 	// Full shader string
 	shaderstr += shader;
 
@@ -317,12 +375,24 @@ unsigned int spoutShaders::CreateComputeShader(std::string shader, unsigned int 
 			glCompileShader(computeShader);
 			glAttachShader(computeProgram, computeShader);
 			glLinkProgram(computeProgram);
+
+			// Link error log
+			GLsizei length = 0;
+			glGetProgramiv(computeProgram, GL_INFO_LOG_LENGTH, &length);
+			if (length > 0) {
+				char infoLog[1024]{};
+				glGetProgramInfoLog(computeProgram, 1024, &length, infoLog);
+				if (length > 0)
+					SpoutLogWarning("CreateComputeShader - link error log\n%s", infoLog);
+			}
+
 			glGetProgramiv(computeProgram, GL_LINK_STATUS, &status);
-			if (status == 0) {
-				SpoutLogError("CreateComputeShader - glGetProgramiv failed");
+			if (status == GL_FALSE) {
+				SpoutLogError("CreateComputeShader - linking failed");
 				glDetachShader(computeProgram, computeShader);
 				glDeleteProgram(computeShader);
 				glDeleteProgram(computeProgram);
+				return 0;
 			}
 			else {
 				// After linking, the shader object is not needed

@@ -20,15 +20,17 @@
 */
 #pragma once
 
-// To avoid Openframeworks warning
-#define BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
-
-// Enable this define to create a receiver rather than the default sender
+// Enable this define to create a receiver rather than a sender
 // #define BUILDRECEIVER
+
+// To avoid Openframeworks warning
+// "Boost.Config is older than your compiler version"
+#define BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
 
 #include "ofMain.h"
 #include "resource.h"
 #include "commdlg.h"
+
 
 #include "Addons\ofxSkybox\ofxSkyBox.h" // Skybox addon
 #include "Addons\ofxWinMenu\ofxWinMenu.h" // Windows menu addon
@@ -46,22 +48,23 @@ class ofApp : public ofBaseApp{
 		void keyPressed(int key);
 		void windowResized(int w, int h);
 
-#ifdef BUILDRECEIVER
-		Spout receiver;
-		ofTexture myTexture; // Receiving texture
-#else
-		Spout sender;
-#endif
-	
+		ofxWinMenu* menu{};
+		ofTrueTypeFont myFont{};
+
+		// For about box
+		int adapterIndex; // Current graphics adapter index
+		char adapterName[256]; // Current graphics adapter name
+		int spoutVersion = 0;
+		HINSTANCE g_hInstance;
+		HWND g_hWnd;
+
+		Spout sender; // For either sender or receiver re-send
 		char senderName[256]{};
 		unsigned int senderWidth = 0; // Dimensions of the sender can be independent
 		unsigned int senderHeight = 0; // of the application window if using an fbo
 		double g_SenderFps = 0.0; // For fps display averaging
-		ofImage myBoxImage{}; // Image for the 3D demo
 		ofFbo myFbo{}; // For texture sharing
-		float rotX = 0;
-		float rotY = 0;
-		GLint glFormat = GL_RGBA; // Default OpenGL texture format
+		GLint glFormat = GL_RGBA; // Sender OpenGL texture format
 
 		bool bTopmost = false;
 		bool bFullScreen = false;
@@ -79,10 +82,21 @@ class ofApp : public ofBaseApp{
 		HMENU g_hMenu = NULL; // Original menu
 		DWORD g_dwStyle = 0; // Original style
 
+		// Common functions
+		bool LoadWindowsFont(ofTrueTypeFont& font, std::string name, int size);
 		void appMenuFunction(string title, bool bChecked);
+		void DrawString(std::string str, int posx, int posy);
+		
+#ifdef BUILDRECEIVER
+
+		Spout receiver;
+		char receiverName[256]{}; // Re-sending name
+
+		ofTexture myTexture; // Receiving texture
+		spoutShaders shaders; // For image adjust
+		ofImage myImage; // For image load
 		void doFullScreen(bool bEnable, bool PreviewMode);
 
-#ifdef BUILDRECEIVER
 		// Recording
 		spoutRecord recorder;
 		char g_Initfile[MAX_PATH]={0};
@@ -103,21 +117,18 @@ class ofApp : public ofBaseApp{
 		bool ReadTextureData(GLuint SourceID, GLuint SourceTarget,
 			unsigned int width, unsigned int height, void* dest,
 			GLenum GLformat, int nChannels);
-
-#endif
-
-		bool EnterSenderName(char *SenderName, char *caption);
-
-		ofTrueTypeFont myFont{};
-		ofxWinMenu* menu{};
+#else
 		ofxSkyBox skybox{};
 		ofEasyCam easycam{};
+		ofImage myBoxImage{}; // Image for the sender cube
+		bool EnterSenderName(char* SenderName, char* caption);
+		bool SelectSenderFormat(GLint glformat);
+		float rotX = 0;
+		float rotY = 0;
+		bool LoadSkyboxImages();
+		bool LoadResourceImage(ofImage& image, int index);
+		ofImage skyImage[6]; // Images for skybox cubemap
+#endif
 
-		// For about box
-		int adapterIndex; // Current graphics adapter index
-		char adapterName[256]; // Current graphics adapter name
-		int spoutVersion = 0;
-		HINSTANCE g_hInstance;
-		HWND g_hWnd;
 
 };

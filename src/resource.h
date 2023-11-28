@@ -3,10 +3,26 @@
 #endif
 
 #define IDI_ICON1                               100
-#define IDC_NAMETEXT                            403
-#define IDD_NAMEBOX                             501
-#define IDD_OPTIONSBOX                          503
-#define IDD_ADJUSTBOX                           504
+
+//
+// Image resources for sender skybox
+// Must be sequential
+#ifndef BUILDRECEIVER
+#define IDC_IMAGEFILE0                          200
+#define IDC_IMAGEFILE1                          201
+#define IDC_IMAGEFILE2                          202
+#define IDC_IMAGEFILE3                          203
+#define IDC_IMAGEFILE4                          204
+#define IDC_IMAGEFILE5                          205
+// image for the cube texture
+#define IDC_BOXIMAGE              206
+#endif
+
+#define IDC_NAMETEXT                500
+#define IDD_NAMEBOX                 501
+#define IDD_FORMATBOX               502
+#define IDD_OPTIONSBOX              503
+#define IDD_ADJUSTBOX               504
 
 #define IDC_BRIGHTNESS                          30000
 #define IDC_BRIGHTNESS_TEXT                     30001
@@ -28,8 +44,10 @@
 #define IDC_SHARPNESS_5x5                       30017
 #define IDC_SHARPNESS_7x7                       30018
 #define IDC_SWAP                                30019
+#define IDC_ADAPTIVE                            30020
 
 #define IDC_IMAGE_TYPE                          40000
+#define IDC_IMAGE_FORMAT                        40001
 #define IDC_PROMPT                              40003
 #define IDC_SHOWFILE                            40004
 #define IDC_DURATION                            40005
@@ -43,4 +61,9 @@
 #define IDC_PRESET                              40013
 #define IDC_OPTIONS_RESET                       40014
 #define IDC_OPTIONS_HELP                        40015
+
+#define IDC_RESEND                              50000
+#define IDC_RESEND_NAME                         50001
+
+
 

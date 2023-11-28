@@ -1,4 +1,6 @@
+
 // To avoid Openframeworks warning
+// Boost.Config is older than your compiler version
 #define BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
 
 #include "ofMain.h"

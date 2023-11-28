@@ -7,10 +7,31 @@
 #include <richedit.h>
 #include "resource.h"
 
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
+//
+// Image resources for sender skybox
+//
+#ifndef BUILDRECEIVER
+IDC_IMAGEFILE0 RCDATA "DATA/images/spacescape_purple_nebula_1024RT.jpg" // Right - positive x
+IDC_IMAGEFILE1 RCDATA "DATA/images/spacescape_purple_nebula_1024UP.jpg" // Top   - positive y
+IDC_IMAGEFILE2 RCDATA "DATA/images/spacescape_purple_nebula_1024FT.jpg" // Front - positive z
+IDC_IMAGEFILE3 RCDATA "DATA/images/spacescape_purple_nebula_1024LF.jpg" // Left  - negative x
+IDC_IMAGEFILE4 RCDATA "DATA/images/spacescape_purple_nebula_1024DN.jpg" // Down  - negative y
+IDC_IMAGEFILE5 RCDATA "DATA/images/spacescape_purple_nebula_1024BK.jpg" // Back  - negative z
+IDC_BOXIMAGE RCDATA "DATA/images/SpoutLogoMarble3.jpg" // cube face image
+#endif
+
+
+//
+// Icon resources
+//
+IDI_ICON1 ICON "DATA/images/Spout.ico"
+
+
 //
 // Dialog resources
 //
-LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 IDD_NAMEBOX DIALOGEX 0, 0, 186, 57
 STYLE DS_3DLOOK | DS_CENTER | DS_MODALFRAME | DS_SHELLFONT | WS_CAPTION | WS_VISIBLE | WS_POPUP 
 CAPTION "Sender name"
@@ -21,16 +42,25 @@ FONT 9, "Ms Shell Dlg", 0, 0, 1
     DEFPUSHBUTTON   "OK", IDOK, 29, 30, 50, 14, 0, WS_EX_LEFT
 }
 
+IDD_FORMATBOX DIALOGEX 0, 0, 186, 57
+STYLE DS_3DLOOK | DS_CENTER | DS_MODALFRAME | DS_SHELLFONT | WS_CAPTION | WS_VISIBLE | WS_POPUP
+CAPTION "Sender format"
+FONT 9, "Ms Shell Dlg", 0, 0, 1
+{
+    LTEXT           "Format", -1,       38,  8, 36,  9, SS_LEFT, WS_EX_LEFT
+    COMBOBOX        IDC_IMAGE_FORMAT,   68,  7, 70, 80, CBS_DROPDOWN | CBS_HASSTRINGS, WS_EX_LEFT
+    PUSHBUTTON      "Cancel", IDCANCEL, 98, 30, 50, 14, 0, WS_EX_LEFT
+    DEFPUSHBUTTON   "OK", IDOK,         29, 30, 50, 14, 0, WS_EX_LEFT
+}
 
+IDD_OPTIONSBOX DIALOGEX 0, 0, 148, 195
 
-LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
-IDD_OPTIONSBOX DIALOGEX 0, 0, 150, 159
 STYLE DS_3DLOOK | DS_CENTER | DS_SHELLFONT | WS_CAPTION | WS_VISIBLE | WS_POPUP
 CAPTION "Options"
 FONT 9, "Ms Shell Dlg", 0, 0, 1
 {
     LTEXT           "Image type", -1, 18, 17, 42, 9, SS_LEFT, WS_EX_LEFT
-    COMBOBOX        IDC_IMAGE_TYPE, 63, 16, 60, 40, CBS_DROPDOWN | CBS_HASSTRINGS, WS_EX_LEFT
+    COMBOBOX        IDC_IMAGE_TYPE,   63, 16, 60, 40, CBS_DROPDOWN | CBS_HASSTRINGS, WS_EX_LEFT
     GROUPBOX        "Capture", -1, 11, 5, 125, 30, 0, WS_EX_LEFT
     GROUPBOX        "Recording", -1, 11, 38, 125, 94, 0, WS_EX_LEFT
     AUTOCHECKBOX    "File save", IDC_PROMPT, 18, 51, 40, 8, BS_LEFTTEXT, WS_EX_LEFT
@@ -49,14 +79,26 @@ FONT 9, "Ms Shell Dlg", 0, 0, 1
     AUTORADIOBUTTON "High", IDC_QHIGH, 103, 100, 30, 8, 0, WS_EX_LEFT
     LTEXT           "Preset", -1, 18, 113, 21, 9, SS_LEFT, WS_EX_LEFT
     COMBOBOX        IDC_PRESET, 50, 111, 78, 30, CBS_DROPDOWN | CBS_HASSTRINGS, WS_EX_LEFT
-    DEFPUSHBUTTON   "OK", IDOK, 12, 138, 30, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Cancel", IDCANCEL, 43, 138, 30, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Reset", IDC_OPTIONS_RESET, 74, 138, 30, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Help", IDC_OPTIONS_HELP, 105, 138, 30, 14, 0, WS_EX_LEFT
+
+    GROUPBOX        "Re-sending", -1,      11, 135, 125, 35, 0, WS_EX_LEFT
+    /*
+    AUTOCHECKBOX    "Send", IDC_RESEND,    18, 148,  28,  8, BS_LEFTTEXT, WS_EX_LEFT
+    EDITTEXT        IDC_RESEND_NAME,       50, 147,  79, 10, ES_AUTOHSCROLL, WS_EX_LEFT
+    LTEXT           "Sending name", -1,    52, 158,  60,  9, SS_LEFT, WS_EX_LEFT
+    */
+    AUTOCHECKBOX    "Send", IDC_RESEND,    18, 154,  28,  8, BS_LEFTTEXT, WS_EX_LEFT
+    LTEXT           "Sending name", -1,    62, 144,  60,  9, SS_LEFT, WS_EX_LEFT
+    EDITTEXT        IDC_RESEND_NAME,       50, 153,  79, 11, ES_AUTOHSCROLL, WS_EX_LEFT
+
+
+    DEFPUSHBUTTON   "OK",     IDOK,               12, 175,  30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Cancel", IDCANCEL,           43, 175,  30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Reset",  IDC_OPTIONS_RESET,  74, 175,  30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Help",   IDC_OPTIONS_HELP,  105, 175,  30, 14, 0, WS_EX_LEFT
+
 }
 
 
-LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 IDD_ADJUSTBOX DIALOG 0, 0, 200, 220
 STYLE DS_3DLOOK | DS_CENTERMOUSE | DS_SHELLFONT | WS_CAPTION | WS_VISIBLE | WS_POPUP
 CAPTION "Adjust"
@@ -74,6 +116,7 @@ FONT 9, "Microsoft Sans Serif"
         AUTORADIOBUTTON " 3 x 3", IDC_SHARPNESS_3x3, 18, 101, 30, 8, 0, WS_EX_LEFT
         AUTORADIOBUTTON " 5 x 5", IDC_SHARPNESS_5x5, 55, 101, 30, 8, 0, WS_EX_LEFT
         AUTORADIOBUTTON " 7 x 7", IDC_SHARPNESS_7x7, 92, 101, 30, 8, 0, WS_EX_LEFT
+        AUTOCHECKBOX    "Adaptive", IDC_ADAPTIVE, 129, 101, 40, 8, 0, WS_EX_LEFT
         LTEXT           "Gamma", -1, 17, 57, 33, 9, SS_LEFT, WS_EX_LEFT
         CONTROL         "", IDC_GAMMA, TRACKBAR_CLASS, WS_TABSTOP | TBS_BOTH | TBS_NOTICKS, 56, 57, 100, 10, WS_EX_LEFT
         LTEXT           "Static", IDC_GAMMA_TEXT, 164, 57, 18, 9, SS_LEFT, WS_EX_LEFT
@@ -94,25 +137,15 @@ FONT 9, "Microsoft Sans Serif"
         PUSHBUTTON      "Reset", IDC_RESET,     68, 197, 30, 14, 0, WS_EX_LEFT
         PUSHBUTTON      "OK", IDOK,             99, 197, 30, 14, 0, WS_EX_LEFT
         PUSHBUTTON      "Cancel", IDCANCEL,    130, 197, 30, 14, 0, WS_EX_LEFT
-
 }
-
-
-//
-// Icon resources
-//
-LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
-IDI_ICON1          ICON           "Spout.ico"
-
 
 
 //
 // Version Information resources
 //
-LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 VS_VERSION_INFO VERSIONINFO
-    FILEVERSION     1,0,1,5
-    PRODUCTVERSION  1,0,1,5
+    FILEVERSION     1,0,1,6
+    PRODUCTVERSION  1,0,1,6
     FILEOS          VOS_NT
     FILETYPE        VFT_APP
     FILESUBTYPE     VFT2_UNKNOWN
@@ -124,13 +157,20 @@ VS_VERSION_INFO VERSIONINFO
         BLOCK "080904E4"
         {
             VALUE "CompanyName", "Leading Edge Pty. Ltd.\0"
-            VALUE "FileDescription", "SpoutDemo\0"
-            VALUE "FileVersion", "1.015\0"
-            VALUE "InternalName", "SpoutDemo\0"
+            VALUE "FileVersion", "1.016\0"
+            VALUE "ProductVersion", "1.016\0"
             VALUE "LegalCopyright", "Copyright \251 2022-2023 Lynn Jarvis\0"
-            VALUE "OriginalFilename", "SpoutDemo.exe\0"
-            VALUE "ProductName", "SpoutDemo\0"
-            VALUE "ProductVersion", "1.015\0"
+#ifdef BUILDRECEIVER
+            VALUE "FileDescription", "Spout Receiver\0"
+            VALUE "InternalName", "Spout Receiver\0"
+            VALUE "OriginalFilename", "SpoutReceiver.exe\0"
+            VALUE "ProductName", "Spout Receiver\0"
+#else
+            VALUE "FileDescription", "Spout Sender\0"
+            VALUE "InternalName", "Spout Sender\0"
+            VALUE "OriginalFilename", "SpoutSender.exe\0"
+            VALUE "ProductName", "Spout Sender\0"
+#endif
         }
     }
     BLOCK "VarFileInfo"

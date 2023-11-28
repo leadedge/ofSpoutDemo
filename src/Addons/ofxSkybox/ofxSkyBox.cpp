@@ -6,11 +6,18 @@
 //
 
 
-// LJ DEBUG
+// LJ revisions
 // C++ code analysis warning 26812 for VS2022
 // Class enums have cascading effects.
 // Many other libraries do not use them at this time.
 #pragma warning(disable : 26812)
+// To avoid Openframeworks warning
+// Boost.Config is older than your compiler version
+#define BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
+//
+// 23.11.23 ofxSkyBox  - add loadShaders()
+// 25.11.23 add shader source to ofxSkybox.h and load shaders from string
+//
 
 #include "ofxSkyBox.h"
 
@@ -20,16 +27,24 @@ ofxSkyBox::ofxSkyBox(){
 
 void ofxSkyBox::load(){
 
-    cubeshader.load("shaders/skybox");
+    cubeshader.load("build/shaders/skybox");
 
+	// Not used
 	cubeMap.loadImages(
-		"images/spacescape_purple_nebula_1024RT.jpg",  // Right - positive x
-		"images/spacescape_purple_nebula_1024UP.jpg",  // Top   - positive y
-		"images/spacescape_purple_nebula_1024FT.jpg",  // Front - positive z
-		"images/spacescape_purple_nebula_1024LF.jpg",  // Left  - negative x
-		"images/spacescape_purple_nebula_1024DN.jpg",  // Down  - negative y
-		"images/spacescape_purple_nebula_1024BK.jpg"); // Back  - negative z
+		"build/images/spacescape_purple_nebula_1024RT.jpg",  // Right - positive x
+		"build/images/spacescape_purple_nebula_1024UP.jpg",  // Top   - positive y
+		"build/images/spacescape_purple_nebula_1024FT.jpg",  // Front - positive z
+		"build/images/spacescape_purple_nebula_1024LF.jpg",  // Left  - negative x
+		"build/images/spacescape_purple_nebula_1024DN.jpg",  // Down  - negative y
+		"build/images/spacescape_purple_nebula_1024BK.jpg"); // Back  - negative z
 
+}
+
+void ofxSkyBox::loadShaders() {
+	cubeshader.setupShaderFromSource(GL_VERTEX_SHADER, skyboxvert.c_str());
+	cubeshader.setupShaderFromSource(GL_FRAGMENT_SHADER, skyboxfrag.c_str());
+	cubeshader.linkProgram();
+	// cubeshader.load("build/shaders/skybox");
 }
 
 void ofxSkyBox::draw() {

@@ -20,19 +20,12 @@ public:
 	
 	unsigned int textureObject;	
 	
-	//these should all be the same size
+	// These should all be the same size
 	// and all power of two, i.e. 256, 512, 1024 (I think)
 	void loadImages( string pos_x, string pos_y, string pos_z, string neg_x,string neg_y,string neg_z)
 	{	
-		ofImage images[6];	
-		/*
-		bool loaded1 = images[0].load(pos_x);
-		bool loaded2 = images[1].load(neg_x);
-		bool loaded3 = images[2].load(pos_y);
-		bool loaded4 = images[3].load(neg_y);
-		bool loaded5 = images[4].load(pos_z);
-		bool loaded6 = images[5].load(neg_z);
-		*/
+		ofImage images[6];
+
 		images[0].load(pos_x);
 		images[1].load(neg_x);
 		images[2].load(pos_y);

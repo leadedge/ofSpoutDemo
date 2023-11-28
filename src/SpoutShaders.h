@@ -68,38 +68,38 @@ class SPOUT_DLLEXP spoutShaders {
 			float brightness, float contrast, 
 			float saturation, float gamma);
 
+		// Gaussian blur
+		bool Blur(GLuint SourceID, GLuint DestID,
+			unsigned int width, unsigned int height, float amount);
+
 		// Unsharp mask sharpen
 		bool Sharpen(GLuint SourceID, GLuint DestID, 
 			unsigned int width, unsigned int height,
 			float sharpenWidth, float sharpenStrength);
 
-		// Gaussian blur
-		bool Blur(GLuint SourceID, GLuint DestID, 
+		// Contrast adaptive sharpen
+		bool AdaptiveSharpen(GLuint SourceID,
+			unsigned int width, unsigned int height, float caswidth, float caslevel);
+
+		// Kuwahara
+		bool Kuwahara(GLuint SourceID, GLuint DestID, 
 			unsigned int width, unsigned int height, float amount);
 
 		// Shader format
 		void SetGLformat(GLint glformat);
 		void CheckShaderFormat(std::string &shaderstr);
 
-		// Globals
+		// Global program identifiers
 		GLuint m_copyProgram    = 0;
 		GLuint m_flipProgram    = 0;
 		GLuint m_mirrorProgram  = 0;
 		GLuint m_swapProgram    = 0;
-
 		GLuint m_brcosaProgram  = 0;
-		float m_brightness      = 0.0f; // -1 > 1
-		float m_contrast        = 1.0f; //  0 > 1
-		float m_saturation      = 1.0f; //  0 > 1
-		float m_gamma           = 1.0f; //  0 > 1
-
-		GLuint m_sharpenProgram = 0;
-		float m_sharpWidth      = 1.0f; // 1=3x3, 2=5x5, 3=7x7
-		float m_sharpStrength   = 1.0f; // 1 > 3 typical
-
 		GLuint m_hBlurProgram   = 0;
 		GLuint m_vBlurProgram   = 0;
-		float m_blurAmount      = 0.0f; // 1 > 4 typical
+		GLuint m_sharpenProgram = 0;
+		GLuint m_casProgram     = 0;
+		GLuint m_kuwaharaProgram = 0;
 
 	protected :
 
@@ -224,17 +224,18 @@ class SPOUT_DLLEXP spoutShaders {
 		//
 		std::string m_sharpenstr = "layout(rgba8, binding=0) uniform image2D src;\n"
 			"layout(rgba8, binding=1) uniform writeonly image2D dst;\n"
-			"layout(location = 0) uniform float width;\n"
-			"layout(location = 1) uniform float strength;\n"
+			"layout(location = 0) uniform float sharpenwidth;\n"
+			"layout(location = 1) uniform float sharpenstrength;\n"
 			"\n"
 		"void main() {\n"
 			"// Sharpen \n"
 			// Original pixel
 			"vec4 orig = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
 			"\n"
-			// Get the blur neighbourhood
-			"float dx = width;\n"
-			"float dy = width;\n"
+			// Get the blur neighbourhood 3x3 or 5x5
+			"float dx = sharpenwidth;\n"
+			"float dy = sharpenwidth;\n"
+			// "float dy = height;\n"
 			"\n"
 			"vec4 c1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(-dx, -dy));\n"
 			"vec4 c2 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, -dy));\n"
@@ -254,7 +255,7 @@ class SPOUT_DLLEXP spoutShaders {
 			//  c6 c7 c8
 			"vec4 blur = ((c1 + c3 + c6 + c8) + 2.0 * (c2 + c4 + c5 + c7) + 4.0 * orig) / 16.0;\n"
 			// Subtract the blurred image from the original image
-			"vec4 coeff_blur = vec4(strength);\n"
+			"vec4 coeff_blur = vec4(sharpenstrength);\n"
 			"vec4 coeff_orig = vec4(1.0) + coeff_blur;\n"
 			"vec4 c9 = coeff_orig * orig - coeff_blur * blur;\n"
 			"\n"
@@ -316,6 +317,141 @@ class SPOUT_DLLEXP spoutShaders {
 			"\n"
 		"}\n";
 
+		//
+		// Contrast Adaptive sharpening
+		//
+		// AMD FidelityFX https://gpuopen.com/fidelityfx-cas/
+		// Adapted from  https://www.shadertoy.com/view/ftsXzM
+		//
+		std::string m_casstr = "layout(rgba8, binding=0) uniform image2D src;\n"
+			"layout (location = 0) uniform float caswidth;\n"
+			"layout (location = 1) uniform float caslevel;\n"
+			//
+			"float luminance(in vec3 col)\n"
+			"{\n"
+			"	return dot(vec3(0.2126, 0.7152, 0.0722), col);\n"
+			"}\n"
+			"void main() {\n"
+				// Centre pixel (rgba)
+				"vec4 c0 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
+				// Offsets 1, 2, 3
+				"float dx = caswidth;\n"
+				"float dy = caswidth;\n"
+				//
+				// Neighbourhood
+				//
+				//     b
+				//  a  x  c
+				//     d
+				//
+				// Centre pixel (rgb)
+				"vec3 col = imageLoad(src, ivec2(gl_GlobalInvocationID.xy)).rgb;\n" // x
+				"float max_g = luminance(col);\n"
+				"float min_g = luminance(col);\n"
+				//
+				"vec3 col1;\n"
+				"col1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(-dx, 0.0)).rgb;\n" // a
+				"max_g = max(max_g, luminance(col1));\n"
+				"min_g = min(min_g, luminance(col1));\n"
+				"vec3 colw = col1;\n"
+				//
+				"col1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, dy)).rgb;\n" // b
+				"max_g = max(max_g, luminance(col1));\n"
+				"min_g = min(min_g, luminance(col1));\n"
+				"colw += col1;\n"
+				//
+				"col1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(dx, 0.0)).rgb;\n" // c
+				"max_g = max(max_g, luminance(col1));\n"
+				"min_g = min(min_g, luminance(col1));\n"
+				"colw += col1;\n"
+				//
+				"col1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, dy)).rgb;\n" // d
+				"max_g = max(max_g, luminance(col1));\n"
+				"min_g = min(min_g, luminance(col1));\n"
+				"colw += col1;\n"
+				// 
+				// CAS algorithm
+				//
+				"float d_min_g = min_g;\n"
+				"float d_max_g = 1.0-max_g;\n"
+				"float A;\n"
+				"if (d_max_g < d_min_g) {\n"
+				"    A = d_max_g / max_g;\n"
+				"} else {\n"
+				"    A = d_min_g / max_g;\n"
+				"}\n"
+				"A = sqrt(A);\n"
+				"A *= mix(-0.125, -0.2, caslevel);\n" // level - CAS level 0-1
+				// Sharpened result
+				"vec3 col_out = (col+colw*A)/(1.0+4.0*A);\n"
+				// Output
+				"imageStore(src, ivec2(gl_GlobalInvocationID.xy), vec4(col_out, c0.a));\n"
+			"}";
+
+
+		//
+		// Kuwahara effect
+		// Adapted from : Jan Eric Kyprianidis (http://www.kyprianidis.com/)
+		//
+		std::string m_kuwaharastr = "layout(rgba8, binding=0) uniform image2D src;\n"
+			"layout(rgba8, binding=1) uniform writeonly image2D dst;\n"
+			"layout(location = 0) uniform float radius;\n"
+			"\n"
+		"void main() {\n"
+			"\n"
+			"	vec3 m[4];\n"
+			"	vec3 s[4];\n"
+			"	for (int j = 0; j < 4; ++j) {\n"
+			"		m[j] = vec3(0.0);\n"
+			"		s[j] = vec3(0.0);\n"
+			"	}\n"
+			"\n"
+			"	vec3 c;\n"
+			"	int ir = int(floor(radius));\n"
+			"	for (int j = -ir; j <= 0; ++j) {\n"
+			"		for (int i = -ir; i <= 0; ++i) {\n"
+			"			c = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j)).rgb;\n"
+			"			m[0] += c;\n"
+			"			s[0] += c * c;\n"
+			"		}\n"
+			"	}\n"
+			"\n"
+			"	for (int j = -ir; j <= 0; ++j) {\n"
+			"		for (int i = 0; i <= ir; ++i) {\n"
+			"			c = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j)).rgb;\n"
+			"			m[1] += c;\n"
+			"			s[1] += c * c;\n"
+			"		}\n"
+			"	}\n"
+			"\n"
+			"	for (int j = 0; j <= ir; ++j) {\n"
+			"		for (int i = 0; i <= ir; ++i) {\n"
+			"			c = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j)).rgb;\n"
+			"			m[2] += c;\n"
+			"			s[2] += c * c;\n"
+			"		}\n"
+			"	}\n"
+			"\n"
+			"	for (int j = 0; j <= ir; ++j) {\n"
+			"		for (int i = -ir; i <= 0; ++i) {\n"
+			"			c = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j)).rgb;\n"
+			"			m[3] += c;\n"
+			"			s[3] += c * c;\n"
+			"		}\n"
+			"	}\n"
+			"\n"
+			"	float min_sigma2 = 1e+2;\n"
+			"	float n = float((radius+1)*(radius+1));\n"
+			"	for (int k = 0; k < 4; ++k) {\n"
+			"		m[k] /= n;\n"
+			"		s[k] = abs(s[k] / n - m[k] * m[k]);\n"
+			"		float sigma2 = s[k].r + s[k].g + s[k].b;\n"
+			"		if (sigma2 < min_sigma2) {\n"
+			"			min_sigma2 = sigma2;\n"
+			"			imageStore(dst, ivec2(gl_GlobalInvocationID.xy), vec4(m[k], 1.0));\n"
+			"		}\n"
+			"	}\n"
+		"}\n";
 
 	// ============================================================
 

@@ -58,6 +58,8 @@ class ofxWinMenu {
 		bool AddPopupItem(HMENU hSubMenu, string ItemName, bool bChecked, bool bAutoCheck);
 		bool AddPopupSeparator(HMENU hSubMenu);
 
+
+
 		// Set the menu to the application
 		bool SetWindowMenu();
 
