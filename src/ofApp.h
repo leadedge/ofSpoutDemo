@@ -2,7 +2,7 @@
 
 	Spout OpenFrameworks Demo program
 
-	Copyright (C) 2020-2023 Lynn Jarvis.
+	Copyright (C) 2020-2024 Lynn Jarvis.
 
 	This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -84,7 +84,7 @@ class ofApp : public ofBaseApp{
 
 		// Common functions
 		bool LoadWindowsFont(ofTrueTypeFont& font, std::string name, int size);
-		void appMenuFunction(string title, bool bChecked);
+		void appMenuFunction(std::string title, bool bChecked);
 		void DrawString(std::string str, int posx, int posy);
 		
 #ifdef BUILDRECEIVER

@@ -5,8 +5,7 @@
 #define IDI_ICON1                               100
 
 //
-// Image resources for sender skybox
-// Must be sequential
+// Image resources for sender skybox (must be sequential)
 #ifndef BUILDRECEIVER
 #define IDC_IMAGEFILE0                          200
 #define IDC_IMAGEFILE1                          201
@@ -59,11 +58,10 @@
 #define IDC_QMED                                40011
 #define IDC_QHIGH                               40012
 #define IDC_PRESET                              40013
-#define IDC_OPTIONS_RESET                       40014
-#define IDC_OPTIONS_HELP                        40015
-
-#define IDC_RESEND                              50000
-#define IDC_RESEND_NAME                         50001
+#define IDC_RESEND                              40014
+#define IDC_RESEND_NAME                         40015
+#define IDC_OPTIONS_RESET                       40016
+#define IDC_OPTIONS_HELP                        40017
 
 
 
