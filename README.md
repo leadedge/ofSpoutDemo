@@ -7,13 +7,15 @@ The receiver includes image capture, video recording, image adjustment and dialo
 
 ## Binaries
 
-The latest [Release](https://github.com/leadedge/ofSpoutDemo/releases) contains all files required. Refer to the individial folder readme files.
+The latest [Release](https://github.com/leadedge/ofSpoutDemo/releases) contains sender and receiver applications. FFmpeg.exe is additionally required. Refer to the individial folder readme.txt files.
 
 ## Sender
 
 ### File menu
 * Sender name\
 Enter a name for the sender instead of the default "Spout Sender".
+* Sender format\
+Select the OpenGL format for the sender.
 
 ### Window menu
 * Show on top\
@@ -32,9 +34,9 @@ Enter a file name to record.\
 Default folder is "bin\data\videos".
 
 ### View menu
-* Adjust\
+#### Adjust
 Live image adjustment
-* Options\
+#### Options
 Opens a dialog with capture and recording options.
 * Image type\
 Multiple image types are supported. See "Help" for details.
@@ -52,10 +54,12 @@ h264 codec can be used instead of default Mpeg4.
 h264 constant rate factor CRF (0 > 51) : low = 28, medium = 23, high = 18.
 * Preset - h264 preset\
 ultrafast, superfast, veryfast, faster
+* Re-send\
+Enable re-send of the received and processed texture\
+Enter the name for the sender. Different from the received sender.
 * HELP button\
 Shows details of the options.
-* Capture folder
-* Video folder\
+#### Capture folder / Video folder
 Opens file explorer to show captured images and recorded videos.
 
 ### Window menu
@@ -80,21 +84,21 @@ Uses the [ofxWinMenu](https://github.com/leadedge/ofxWinMenu) addon.
 
 The source for both of these is modified and included with the project.
 
-### Setup required for For Visual Studio 2022 and Openframeworks 11.2
+### Setup required for For Visual Studio 2022 and Openframeworks
   
   1) Download [Openframeworks for Windows and Visual Studio](https://openframeworks.cc/download)
-  2) Unzip the files to get a folder containing Openframeworks\
-       e.g. "of_v0.11.2_vs2017_release.zip"
-  3) Copy the folder to a convenient location and rename it as you wish\
-       e.g. somefolder\OPENFRAMEWORKS11
-  4) Download the ["beta"](https://github.com/leadedge/Spout2/tree/beta) branch of the Spout SDK
-  5) Copy the "SpoutGL" folder into the Openframeworks "apps" folder
-  6) Download this repository
-  7) Copy the "ofSpoutDemo" folder and contents to the Openframeworks "apps\myApps" folder.
+  2) Download for the Visual Studio. For example, this could be "of_v0.12.0_vs_release.zip"
+  4) Unzip the files to get a folder containing Openframeworks
+  5) Copy the folder to a convenient location and rename it as you wish\
+       e.g. somefolder\OPENFRAMEWORKS120
+  6) Download the ["beta"](https://github.com/leadedge/Spout2/tree/beta) branch of the Spout SDK
+  7) Copy the "SpoutGL" folder into the Openframeworks "apps" folder
+  8) Download this repository
+  9) Copy the "ofSpoutDemo" folder and contents to the Openframeworks "apps\myApps" folder.
   
 You will then have a folder structure as follows :
   
-OPENFRAMEWORKS11\
+OPENFRAMEWORKS120\
 &nbsp;&nbsp;&nbsp;&nbsp;addons\
 &nbsp;&nbsp;&nbsp;&nbsp;examples\
 &nbsp;&nbsp;&nbsp;&nbsp;apps\
@@ -120,16 +124,14 @@ Open "ofSpoutDemo.sln" with Visual Studio 2022 and set to "Release".
 The first time you use Openframeworks you have to compile the library.\
 RH click on "openframeworksLib" - Build\
 &nbsp;&nbsp;&nbsp;&nbsp;when it is compiled :\
-RH click on "ofSpoutDemo" - Build\
-&nbsp;&nbsp;&nbsp;&nbsp;ofSpoutDemo.exe will be in the "bin" folder.\
-Rename it as required. For example : ofSpoutSender.exe or ofSpoutReceiver.exe
-
-### Build options :
-
 You can build the project either as a sender or receiver\
 Find in ofApp.h :\
 &nbsp;&nbsp;&nbsp;// Change to create a sender or a receiver\
-&nbsp;&nbsp;&nbsp;// #define BUILDRECEIVER
+&nbsp;&nbsp;&nbsp;// #define BUILDRECEIVER\
+Remove the preceding comment to buld a receiver rather than a sender.\
+RH click on "ofSpoutDemo" - Build\
+&nbsp;&nbsp;&nbsp;&nbsp;ofSpoutDemo.exe will be in the "bin" folder.\
+Rename it as required. For example : ofSpoutSender.exe or ofSpoutReceiver.exe
 
 ### Modifications
 
