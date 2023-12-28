@@ -122,7 +122,7 @@ class ofApp : public ofBaseApp{
 		ofEasyCam easycam{};
 		ofImage myBoxImage{}; // Image for the sender cube
 		bool EnterSenderName(char* SenderName, char* caption);
-		bool SelectSenderFormat(GLint glformat);
+		bool SelectSenderFormat();
 		float rotX = 0;
 		float rotY = 0;
 		bool LoadSkyboxImages();

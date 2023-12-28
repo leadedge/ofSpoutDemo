@@ -3,7 +3,7 @@
     Spout OpenFrameworks Demo program
 
     Spout 2.007
-    OpenFrameworks 11.1
+    OpenFrameworks 12.0
     Visual Studio 2022
 
     Copyright (C) 2020-2024 Lynn Jarvis.
@@ -86,6 +86,9 @@
 	07.12.23 - Use spoututils RemovePath for image save and stop recording messagebox
 	08.12.23 - Add Help button to About dialog
 	20.12.23 - Rebuild with revised SpoutUtils
+	28.12.23 - Revise SelectSenderFormat and comments
+			   Add preprocessor define _HAS_STD_BYTE=0 for Openframeworks 12.0
+			   to avoid std::byte definition conflict for C++17
 			   OF120 VS2022 x64 /MT
 			   Version 1.017
 
@@ -185,7 +188,7 @@ static PSTR szCaption;
  // Enter sender format
 static INT_PTR CALLBACK SenderFormat(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 static GLint format = 0;
-static int formatindex; // for the combobox
+static int formatindex = 0; // for the combobox
 #endif
 
 //--------------------------------------------------------------
@@ -1014,7 +1017,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 	}
 
 	if (title == "Sender format") {
-		SelectSenderFormat(glFormat);
+		SelectSenderFormat();
 	}
 
 #endif
@@ -2090,12 +2093,14 @@ INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 }
 
 //--------------------------------------------------------------
-bool ofApp::SelectSenderFormat(GLint glformat)
+bool ofApp::SelectSenderFormat()
 {
 	// Show the dialog box 
 	int retvalue = (int)DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_FORMATBOX), g_hWnd, (DLGPROC)SenderFormat);
 
 	// OK - sender OpenGL format has been entered
+	// The Selected index is the static variable "formatindex"
+	// The global format value "glFormat" can be established from this.
 	if (retvalue != 0) {
 		// "Default", "8 bit RGBA", "16 bit RGBA", "16 bit RGBA float", "32 bit RGBA float"
 		switch(formatindex) {

@@ -91,7 +91,7 @@
       <Optimization>Disabled</Optimization>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_HAS_STD_BYTE=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
@@ -110,7 +110,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_HAS_STD_BYTE=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -128,7 +128,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_HAS_STD_BYTE=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;src\Addons\ofxWinMenu;src\Addons\ofxSkyBox\src;src\Nvapi\include</AdditionalIncludeDirectories>
@@ -149,7 +149,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_HAS_STD_BYTE=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;src\Addons\ofxWinMenu;src\Addons\ofxSkyBox\src;src\Nvapi\include</AdditionalIncludeDirectories>
@@ -170,17 +170,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\Spout.cpp" />
-    <ClCompile Include="..\SpoutCopy.cpp" />
-    <ClCompile Include="..\SpoutDirectX.cpp" />
-    <ClCompile Include="..\SpoutFrameCount.cpp" />
-    <ClCompile Include="..\SpoutGL.cpp" />
-    <ClCompile Include="..\SpoutGLextensions.cpp" />
-    <ClCompile Include="..\SpoutReceiver.cpp" />
-    <ClCompile Include="..\SpoutSender.cpp" />
-    <ClCompile Include="..\SpoutSenderNames.cpp" />
-    <ClCompile Include="..\SpoutSharedMemory.cpp" />
-    <ClCompile Include="..\SpoutUtils.cpp" />
+    <ClCompile Include="..\..\SpoutGL\Spout.cpp" />
+    <ClCompile Include="..\..\SpoutGL\SpoutCopy.cpp" />
+    <ClCompile Include="..\..\SpoutGL\SpoutDirectX.cpp" />
+    <ClCompile Include="..\..\SpoutGL\SpoutFrameCount.cpp" />
+    <ClCompile Include="..\..\SpoutGL\SpoutGL.cpp" />
+    <ClCompile Include="..\..\SpoutGL\SpoutGLextensions.cpp" />
+    <ClCompile Include="..\..\SpoutGL\SpoutReceiver.cpp" />
+    <ClCompile Include="..\..\SpoutGL\SpoutSender.cpp" />
+    <ClCompile Include="..\..\SpoutGL\SpoutSenderNames.cpp" />
+    <ClCompile Include="..\..\SpoutGL\SpoutSharedMemory.cpp" />
+    <ClCompile Include="..\..\SpoutGL\SpoutUtils.cpp" />
     <ClCompile Include="src\Addons\ofxSkybox\ofxCubeMap.cpp" />
     <ClCompile Include="src\Addons\ofxSkybox\ofxSkyBox.cpp" />
     <ClCompile Include="src\Addons\ofxWinMenu\ofxWinMenu.cpp" />
@@ -190,18 +190,18 @@
     <ClCompile Include="src\SpoutShaders.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\Spout.h" />
-    <ClInclude Include="..\SpoutCommon.h" />
-    <ClInclude Include="..\SpoutCopy.h" />
-    <ClInclude Include="..\SpoutDirectX.h" />
-    <ClInclude Include="..\SpoutFrameCount.h" />
-    <ClInclude Include="..\SpoutGL.h" />
-    <ClInclude Include="..\SpoutGLextensions.h" />
-    <ClInclude Include="..\SpoutReceiver.h" />
-    <ClInclude Include="..\SpoutSender.h" />
-    <ClInclude Include="..\SpoutSenderNames.h" />
-    <ClInclude Include="..\SpoutSharedMemory.h" />
-    <ClInclude Include="..\SpoutUtils.h" />
+    <ClInclude Include="..\..\SpoutGL\Spout.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutCommon.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutCopy.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutDirectX.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutFrameCount.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutGL.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutGLextensions.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutReceiver.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutSender.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutSenderNames.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutSharedMemory.h" />
+    <ClInclude Include="..\..\SpoutGL\SpoutUtils.h" />
     <ClInclude Include="src\Addons\ofxSkybox\ofxCubeMap.h" />
     <ClInclude Include="src\Addons\ofxSkybox\ofxSkyBox.h" />
     <ClInclude Include="src\Addons\ofxWinMenu\ofxWinMenu.h" />
