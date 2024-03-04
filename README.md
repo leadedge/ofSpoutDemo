@@ -125,8 +125,8 @@ The first time you use Openframeworks you have to compile the library.\
 RH click on "openframeworksLib" - Build\
 &nbsp;&nbsp;&nbsp;&nbsp;when it is compiled :\
 You can build the project either as a sender or receiver\
-Find in ofApp.h :\
-&nbsp;&nbsp;&nbsp;// Change to create a sender or a receiver\
+Find in resource.h :\
+&nbsp;&nbsp;&nbsp;// Enable this define to create a receiver rather than a sender\
 &nbsp;&nbsp;&nbsp;// #define BUILDRECEIVER\
 Remove the preceding comment to buld a receiver rather than a sender.\
 RH click on "ofSpoutDemo" - Build\
