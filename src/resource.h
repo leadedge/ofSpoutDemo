@@ -1,3 +1,9 @@
+//
+// Enable this define to create a receiver rather than a sender
+#define BUILDRECEIVER
+//
+
+
 #ifndef IDC_STATIC
 #define IDC_STATIC (-1)
 #endif

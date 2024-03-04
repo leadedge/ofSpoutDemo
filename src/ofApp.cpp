@@ -91,6 +91,14 @@
 			   to avoid std::byte definition conflict for C++17
 			   OF120 VS2022 x64 /MT
 			   Version 1.017
+	02.01.24 - Increase sender starting resolution to 1280x720
+			   Modify skybox addon draw for the larger size.
+	14.01.24 - WindowResized - update the sender dimensions to match the window size
+			   unless smaller than the starting resolution 1280x720
+	16.02.24 - Move BUILDRECEIVER define from ofApp.h to resource.h so that it is 
+			   available in resource.rc and version information is set as receiver or sender
+			   Version 1.018
+ 
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -319,10 +327,9 @@ void ofApp::setup() {
 	GetWindowRect(g_hWnd, &windowRect);
 	GetClientRect(g_hWnd, &clientRect);
 
-	// Set the sender size until received
-	// so that the fbo has initial dimensions
-	senderWidth  = (unsigned int)ofGetWidth();
-	senderHeight = (unsigned int)ofGetHeight();
+	// Set the sender size now so that the fbo has initial dimensions
+	senderWidth  = 1280;
+	senderHeight = 720;
 
 	// Application OpenGL format
 	// Sender   : see SetSenderFormat below
@@ -419,7 +426,6 @@ void ofApp::setup() {
 
 	// Starting value for sender fps display
 	g_SenderFps = GetRefreshRate();
-
 
 } // end setup
 
@@ -904,8 +910,16 @@ void ofApp::windowResized(int w, int h)
 #ifndef BUILDRECEIVER
 	if (w > 0 && h > 0) {
 		// Update the sender dimensions to match the window size
-		senderWidth = w;
-		senderHeight = h;
+		// unless smaller than the starting resolution 1280x720
+		if (w >= 1280 && h >= 720) {
+			senderWidth = w;
+			senderHeight = h;
+		}
+		else {
+			senderWidth = 1280;
+			senderHeight = 720;
+		}
+
 	}
 #else
 	UNREFERENCED_PARAMETER(w);

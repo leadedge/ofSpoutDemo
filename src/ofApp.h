@@ -20,9 +20,6 @@
 */
 #pragma once
 
-// Enable this define to create a receiver rather than a sender
-// #define BUILDRECEIVER
-
 // To avoid Openframeworks warning
 // "Boost.Config is older than your compiler version"
 #define BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
