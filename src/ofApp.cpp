@@ -98,7 +98,16 @@
 	16.02.24 - Move BUILDRECEIVER define from ofApp.h to resource.h so that it is 
 			   available in resource.rc and version information is set as receiver or sender
 			   Version 1.018
- 
+	07.03.24 - Receiver
+			     Check for rgba8 for shaders
+			     Activate shaders on every frame to prevent hesitations
+			     Add "re-size" option for enlarge to fbo.
+			     Shaders operate on enlarged image and is used for "re-send"
+				 Move SpoutMessageBoxIcon to precede about box
+	11.03.24 - Sender
+				 SpoutMessageBox edit control for sender name entry
+				 SpoutMessageBox combo box control for sender format selection
+			   Version 1.019
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -131,6 +140,10 @@ static INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 static char g_ExePath[MAX_PATH]={0}; // Executable path
 static bool bResend = false; // Option to send received texture
 static char g_ReceiverName[256]={0}; // Re-sending name
+static bool bResize = false; // Change re-sending size
+static unsigned int ResizeWidth = 1920; // Starting resize width
+static unsigned int ResizeHeight = 1080; // Starting resize height
+
 static std::string extension = ".png"; // Capture type
 static bool bPrompt = false; // file name entry dialog
 static bool bShowFile = false; // show file name details after save
@@ -157,6 +170,10 @@ int old_preset = preset;
 int old_imagetype = imagetype;
 bool old_bResend = bResend;
 char old_ReceiverName[256]{0};
+bool old_bResize = bResize;
+unsigned int old_ResizeWidth = ResizeWidth;
+unsigned int old_ResizeHeight = ResizeHeight;
+
 
 //
 // Adjustment controls modeless dialog
@@ -188,15 +205,6 @@ static bool OldAdaptive    = false;
 static bool OldFlip        = false;
 static bool OldMirror      = false;
 static bool OldSwap        = false;
-#else
-// Sender name entry
-static INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam); // enter a sender name 
-static PSTR szText;
-static PSTR szCaption;
- // Enter sender format
-static INT_PTR CALLBACK SenderFormat(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
-static GLint format = 0;
-static int formatindex = 0; // for the combobox
 #endif
 
 //--------------------------------------------------------------
@@ -207,7 +215,7 @@ void ofApp::setup() {
 	// OpenSpoutConsole(); // Empty console for debugging
 	// EnableSpoutLog(); // Log to console
 	// SetSpoutLogLevel(SpoutLogLevel::SPOUT_LOG_WARNING); // Log warnings only
-
+	
 #ifdef BUILDRECEIVER
 	strcpy_s(g_ReceiverName, 256, "Spout Receiver"); // Re-sending name
 	// Graphics adapter index and name for about box
@@ -336,6 +344,7 @@ void ofApp::setup() {
 	// Receiver : see ReceiveTexture/IsUpdated and Snapshot (F12 key)
 
 #ifdef BUILDRECEIVER
+
 	// Allocate an RGBA texture to receive from the sender
 	// It is re-allocated later to match the size and format of the sender.
 	myTexture.allocate(senderWidth, senderHeight, glFormat);
@@ -360,8 +369,13 @@ void ofApp::setup() {
 	ReadInitFile(g_Initfile);
 
 	// Set the sender name for re-sending
-	if (bResend)
-		sender.SetSenderName(g_ReceiverName);
+	sender.SetSenderName(g_ReceiverName);
+
+	// Allocate an fbo for re-sizing
+	// Size is independent of the sender
+	// Starting size is 1920x1080, saved after changing options
+	// and retreived by ReadInitFile above
+	myFbo.allocate(ResizeWidth, ResizeHeight, glFormat);
 
 	// Needed for float image capture
 	ofDisableArbTex();
@@ -421,9 +435,6 @@ void ofApp::setup() {
 	easycam.setControlArea(controlArea);
 #endif
 
-	// Custom icon for the SpoutMessagBox, activated by MB_USERICON
-	SpoutMessageBoxIcon(LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
-
 	// Starting value for sender fps display
 	g_SenderFps = GetRefreshRate();
 
@@ -477,7 +488,7 @@ void ofApp::draw() {
 
 	// ReceiveTexture connects to and receives from a sender
 	if (receiver.ReceiveTexture(myTexture.getTextureData().textureID, myTexture.getTextureData().textureTarget)) {
-			
+
 		// If IsUpdated() returns true, the sender has changed
 		// and the receiving texture must be re-allocated.
 		if (receiver.IsUpdated()) {
@@ -492,7 +503,7 @@ void ofApp::draw() {
 
 			// Stop recording if the sender name or size has changed
 			if (strcmp(receiver.GetSenderName(), senderName) != 0
-			    || senderWidth != receiver.GetSenderWidth()
+				|| senderWidth != receiver.GetSenderWidth()
 				|| senderHeight != receiver.GetSenderHeight()) {
 				StopRecording();
 			}
@@ -506,16 +517,32 @@ void ofApp::draw() {
 				sender.ReleaseSender();
 				sender.SetSenderName(g_ReceiverName);
 			}
-
-
 		}
 
-		// If the frame is new, activate shaders on the received texture
-		// Shaders have source and destination textures
-		// but the source texture can also be the destination
-		if (receiver.IsFrameNew()) {
+		// If re-sizing, draw to the resizing fbo
+		if (bResize) {
+			myFbo.begin();
+			myTexture.draw(0, 0, myFbo.getWidth(), myFbo.getHeight());
+			myFbo.end();
+		}
 
-			GLuint myTextureID = myTexture.getTextureData().textureID;
+		// Shaders require rgba8 layout
+		if (glFormat == GL_RGBA8 || glFormat == GL_RGBA) {
+			// Activate shaders on the received texture
+			GLuint textureID = myTexture.getTextureData().textureID;
+			unsigned int width = receiver.GetSenderWidth();
+			unsigned int height = receiver.GetSenderHeight();
+
+			// If re-sizing, shaders operate on the fbo
+			if (bResize) {
+				// fbo texture
+				textureID = myFbo.getTexture().getTextureData().textureID;
+				width = (unsigned int)myFbo.getWidth();
+				height = (unsigned int)myFbo.getHeight();
+			}
+
+			// Shaders have source and destination textures
+			// but the source texture can also be the destination
 
 			// Brightness    -1 - 1   default 0
 			// Contrast       0 - 4   default 1
@@ -526,8 +553,7 @@ void ofApp::draw() {
 				|| Contrast != 1.0
 				|| Saturation != 1.0
 				|| Gamma != 1.0) {
-				shaders.Adjust(myTextureID, myTextureID,
-					receiver.GetSenderWidth(), receiver.GetSenderHeight(),
+				shaders.Adjust(textureID, textureID, width, height,
 					Brightness, Contrast, Saturation, Gamma);
 			}
 
@@ -539,57 +565,63 @@ void ofApp::draw() {
 					// 3x3, 5x5, 7x7 : 3.0, 5.0, 7.0
 					float caswidth = 1.0f+(Sharpwidth-3.0f)/2.0f; // 1.0, 2.0, 3.0
 					// Sharpness; // 0.0 - 1.0
-					shaders.AdaptiveSharpen(myTextureID,
-						receiver.GetSenderWidth(), receiver.GetSenderHeight(),
-						caswidth, Sharpness);
+					shaders.AdaptiveSharpen(textureID, width, height, caswidth, Sharpness);
 				}
 				else {
-					shaders.Sharpen(myTextureID, myTextureID,
-						receiver.GetSenderWidth(), receiver.GetSenderHeight(),
-						Sharpwidth, Sharpness);
+					shaders.Sharpen(textureID, textureID, width, height, Sharpwidth, Sharpness);
 				}
 			}
 
 			// Blur 0 - 4  (default 0)
 			// 0.001 - 0.002 msec
-			if (Blur > 0.0) {
-				shaders.Blur(myTextureID, myTextureID,
-					receiver.GetSenderWidth(), receiver.GetSenderHeight(),
-					Blur);
-			}
+			if (Blur > 0.0)
+				shaders.Blur(textureID, textureID, width, height, Blur);
 
 			if (bFlip)
-				shaders.Flip(myTextureID, receiver.GetSenderWidth(), receiver.GetSenderHeight());
+				shaders.Flip(textureID, width, height);
 			if (bMirror)
-				shaders.Mirror(myTextureID, receiver.GetSenderWidth(), receiver.GetSenderHeight());
+				shaders.Mirror(textureID, width, height);
 			if (bSwap)
-				shaders.Swap(myTextureID, receiver.GetSenderWidth(), receiver.GetSenderHeight());
+				shaders.Swap(textureID, width, height);
+		}
 
-			// Add the frame to video if recording
-			if (bRecording) {
-				recorder.Write(myTexture.getTextureData().textureID, myTexture.getTextureData().textureTarget, senderWidth, senderHeight);
-				ElapsedRecordingTime = (ElapsedMicroseconds()-StartRecordingTime)/1000000.0; // seconds
-				// Check for fixed duration
-				if (bDuration) {
-					if (ElapsedRecordingTime > (double)SecondsDuration) {
-						StopRecording();
-					}
+		// Add a new frame to video if recording
+		// Record at the sender dimensions
+		if (bRecording && receiver.IsFrameNew()) {
+			recorder.Write(myTexture.getTextureData().textureID, myTexture.getTextureData().textureTarget, senderWidth, senderHeight);
+			ElapsedRecordingTime = (ElapsedMicroseconds()-StartRecordingTime)/1000000.0; // seconds
+			// Check for fixed duration
+			if (bDuration) {
+				if (ElapsedRecordingTime > (double)SecondsDuration) {
+					StopRecording();
 				}
 			}
 		}
 
-		// Received texture
-		myTexture.draw(0, 0, ofGetWidth(), ofGetHeight());
-
 		// Re-send if the option is selected
 		if (bResend) {
-			sender.SendTexture(myTexture.getTextureData().textureID,
-				myTexture.getTextureData().textureTarget,
-				(unsigned int)myTexture.getWidth(), (unsigned int)myTexture.getHeight(), false);
+			if (bResize) {
+				// If re-sizing send the resizing fbo
+				myFbo.begin();
+				sender.SendFbo(myFbo.getId(), ResizeWidth, ResizeHeight, false);
+				myFbo.end();
+			}
+			else {
+				// Otherwise send the received texture
+				sender.SendTexture(myTexture.getTextureData().textureID,
+					myTexture.getTextureData().textureTarget,
+					(unsigned int)myTexture.getWidth(),
+					(unsigned int)myTexture.getHeight(), false);
+			}
 		}
 
-	} // endif ReceiveTexture
+		// Draw received texture or fbo
+		if (bResize)
+			myFbo.draw(0, 0, ofGetWidth(), ofGetHeight());
+		else
+			myTexture.draw(0, 0, ofGetWidth(), ofGetHeight());
 
+	} // endif ReceiveTexture
 
 	// Show on-screen details
 	if (bShowInfo && !bFullScreen && !bPreview) {
@@ -597,10 +629,10 @@ void ofApp::draw() {
 			ofSetColor(255);
 			str = "[";
 			str += receiver.GetSenderName();
-			str += "]  (";
+			str += "]  ";
 			str += ofToString(receiver.GetSenderWidth()); str += "x";
-			str += ofToString(receiver.GetSenderHeight()); 
-			
+			str += ofToString(receiver.GetSenderHeight());
+
 			// Received texture OpenGL format
 			// Default DirectX format is DXGI_FORMAT_B8G8R8A8_UNORM
 			// OpenGL name is GL_RGBA8. Do not show.
@@ -609,6 +641,11 @@ void ofApp::draw() {
 				str += receiver.GLformatName(receiver.GLDXformat());
 			}
 
+			if (bResize) {
+				str += "  (Resized to ";
+				str += ofToString(ResizeWidth); str += "x";
+				str += ofToString(ResizeHeight);
+			}
 
 			str += ")";
 			DrawString(str, 20, 30);
@@ -673,7 +710,6 @@ void ofApp::draw() {
 		}
 
 	} // endif show info
-
 
 #else
 
@@ -962,7 +998,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 			SaveImageFile(name);
 		}
 		else {
-			SpoutMessageBox(g_hWnd, "No sender", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 1400);
+			SpoutMessageBox(g_hWnd, "No sender", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 1500);
 		}
 	}
 
@@ -971,7 +1007,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 			StartRecording(true);
 		}
 		else {
-			SpoutMessageBox(g_hWnd, "No sender", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 1400);
+			SpoutMessageBox(g_hWnd, "No sender", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 1500);
 		}
 	}
 	
@@ -1115,6 +1151,9 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 		old_imagetype = imagetype;
 		old_bResend = bResend;
 		strcpy_s(old_ReceiverName, 256, g_ReceiverName);
+		old_bResize = bResize;
+		old_ResizeWidth = ResizeWidth;
+		old_ResizeHeight = ResizeHeight;
 		if (!DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_OPTIONSBOX), g_hWnd, Options)) {
 			extension = old_extension;
 			bPrompt = old_bPrompt;
@@ -1129,12 +1168,17 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 			imagetype = old_imagetype;
 			bResend = old_bResend;
 			strcpy_s(g_ReceiverName, 256, old_ReceiverName);
+			bResize = old_bResize;
+			ResizeWidth = old_ResizeWidth;
+			ResizeHeight = old_ResizeHeight;
 		}
 		else {
 			// Release sender if option has been unchecked or the sender name is different
 			if (!bResend || strcmp(g_ReceiverName, old_ReceiverName) != 0)
 				sender.ReleaseSender();
 			sender.SetSenderName(g_ReceiverName);
+			// Re-allocate the fbo for re-sending size
+			myFbo.allocate(ResizeWidth, ResizeHeight, glFormat);
 		}
 
 	}
@@ -1142,6 +1186,15 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 	// Image adjustment
 	if (title == "Adjust") {
 		if (receiver.IsConnected()) {
+			// Shaders require rgba8 layout
+			if (!(glFormat == GL_RGBA8 || glFormat == GL_RGBA)) {
+				std::string str = "Incompatible sender format (";
+				str += receiver.GLformatName(receiver.GLDXformat());
+				str += ")\nShaders require 8 bit rgba textures\n";
+				SpoutMessageBox(g_hWnd, str.c_str(), "Warning", MB_ICONWARNING | MB_OK);
+				return;
+			}
+
 			if (!hwndAdjust) {
 				OldBrightness = Brightness;
 				OldContrast   = Contrast;
@@ -1258,6 +1311,8 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 
 		SpoutMessageBoxButton(1000, L"Logs");
 		SpoutMessageBoxButton(2000, L"Help");
+		// Custom icon for the SpoutMessagBox, activated by MB_USERICON
+		SpoutMessageBoxIcon(LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
 		int iRet = SpoutMessageBox(g_hWnd, str.c_str(), "About", MB_OK | MB_USERICON | MB_USERBUTTON | MB_TOPMOST);
 		if (iRet == 1000) {
 			// Logs button
@@ -1880,13 +1935,30 @@ void ofApp::WriteInitFile(const char* initfile)
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Topmost", (LPCSTR)"0", (LPCSTR)initfile);
 
-	// Resend options
+	//
+	// Receiver sending options
+	//
+
+	// Re-send
 	if (bResend)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resend", (LPCSTR)"1", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resend", (LPCSTR)"0", (LPCSTR)initfile);
 
 	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Receivername", (LPCSTR)g_ReceiverName, (LPCSTR)initfile);
+	
+	// Re-size
+	if (bResize)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resize", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resize", (LPCSTR)"0", (LPCSTR)initfile);
+	
+	sprintf_s(tmp, MAX_PATH, "%6d", ResizeWidth);
+	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resizewidth", (LPCSTR)tmp, (LPCSTR)initfile);
+	
+	sprintf_s(tmp, MAX_PATH, "%6d", ResizeHeight);
+	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resizeheight", (LPCSTR)tmp, (LPCSTR)initfile);
+
 
 }
 
@@ -1956,10 +2028,18 @@ void ofApp::ReadInitFile(const char* initfile)
 	if (tmp[0]) bShowInfo = (atoi(tmp) == 1);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Topmost", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) bTopmost = (atoi(tmp) == 1);
+	
+	// Receiver sending options
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Resend", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) bResend = (atoi(tmp) == 1);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Receivername", NULL, (LPSTR)tmp, 256, initfile);
 	if (tmp[0]) strcpy_s(g_ReceiverName, 256, tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Resize", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bResize = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Resizewidth", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) ResizeWidth = (unsigned int)atoi(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Resizeheight", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) ResizeHeight = (unsigned int)atoi(tmp);
 
 	// Check menu items
 	if (extension == ".tif") {
@@ -2041,103 +2121,53 @@ bool ofApp::LoadResourceImage(ofImage &image, int index)
 }
 
 //--------------------------------------------------------------
-bool ofApp::EnterSenderName(char *SenderName, char *caption)
+bool ofApp::EnterSenderName(char *name, const char *caption)
 {
-	int retvalue = 0;
-	unsigned char textin[256];
-	unsigned char captin[256];
-
-	// Caption 
-	strcpy_s(szCaption = (PSTR)captin, 256, caption); // move to a static string for the dialog
-
-	// Existing name
-	strcpy_s(szText = (PSTR)textin, 256, SenderName); // move to a static string for the dialog
-
-	// Show the dialog box 
-	retvalue = (int)DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_NAMEBOX), g_hWnd, (DLGPROC)UserSenderName);
-
-	// OK - sender name has been entered
-	if (retvalue != 0) {
-		strcpy_s(SenderName, 256, szText); // Return the entered name
+	std::string strname;
+	SpoutMessageBoxIcon(LoadIconA(GetModuleHandle(NULL), MAKEINTRESOURCEA(IDI_ICON1)));
+	if (SpoutMessageBox(NULL, NULL, caption, MB_OKCANCEL | MB_USERICON, strname) == IDOK) {
+		strcpy_s(name, 256, strname.c_str()); // Return the entered name
 		return true;
 	}
-
 	// Cancel
 	return false;
 
 }
 
 
-// Message handler for sender name entry
-INT_PTR CALLBACK UserSenderName(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	UNREFERENCED_PARAMETER(lParam);
-
-	switch (message) {
-
-	case WM_INITDIALOG:
-		// Set dialog caption
-		SetWindowTextA(hDlg, szCaption);
-		// Fill text entry box with passed string
-		SetDlgItemTextA(hDlg, IDC_NAMETEXT, szText);
-		// Select all text in the edit field
-		SendDlgItemMessage(hDlg, IDC_NAMETEXT, EM_SETSEL, 0, 0x7FFF0000L);
-		// Set topmost
-		SetWindowPos(hDlg, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-		return (INT_PTR)TRUE;
-
-	case WM_COMMAND:
-		switch (LOWORD(wParam)) {
-		case IDOK:
-			// Get contents of edit field into static 256 char string
-			GetDlgItemTextA(hDlg, IDC_NAMETEXT, szText, 256);
-			EndDialog(hDlg, 1);
-			break;
-		case IDCANCEL:
-			// User pressed cancel.  Just take down dialog box.
-			EndDialog(hDlg, 0);
-			return (INT_PTR)TRUE;
-		default:
-			return (INT_PTR)FALSE;
-		}
-		break;
-	}
-
-	return (INT_PTR)FALSE;
-}
-
 //--------------------------------------------------------------
 bool ofApp::SelectSenderFormat()
 {
-	// Show the dialog box 
-	int retvalue = (int)DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_FORMATBOX), g_hWnd, (DLGPROC)SenderFormat);
+	std::vector<std::string> items;
+	// "Default", "8 bit RGBA", "16 bit RGBA", "16 bit RGBA float", "32 bit RGBA float"
+	items.push_back("Default"); // DXGI_FORMAT_B8G8R8A8_UNORM
+	items.push_back("8 bit RGBA"); // DXGI_FORMAT_R8G8B8A8_UNORM
+	items.push_back("16 bit RGBA");
+	items.push_back("16 bit RGBA float");
+	items.push_back("32 bit RGBA float");
+	int selected = 0;
+	switch (glFormat) {
+		case GL_RGBA:    selected = 1;	break;
+		case GL_RGBA16:	 selected = 2; break;
+		case GL_RGBA16F: selected = 3; break;
+		case GL_RGBA32F: selected = 4; break;
+		default: selected = 0; break;
+	}
+	if (sender.GetDX11format() == DXGI_FORMAT_B8G8R8A8_UNORM) // default
+		selected = 0;
 
-	// OK - sender OpenGL format has been entered
-	// The Selected index is the static variable "formatindex"
-	// The global format value "glFormat" can be established from this.
-	if (retvalue != 0) {
-		// "Default", "8 bit RGBA", "16 bit RGBA", "16 bit RGBA float", "32 bit RGBA float"
-		switch(formatindex) {
-			case 0:
-				glFormat = GL_RGBA;
-				// Default DirectX output format
-				break;
-			case 1:
-				glFormat = GL_RGBA;
-				break;
-			case 2:
-				glFormat = GL_RGBA16;
-				break;
-			case 3:
-				glFormat = GL_RGBA16F;
-				break;
-			case 4:
-				glFormat = GL_RGBA32F;
-				break;
+	if (SpoutMessageBox(NULL, NULL, "Sender format", MB_ICONINFORMATION | MB_OKCANCEL, items, selected) == IDOK) {
+		switch (selected) {
+			// Default DirectX output format
+			case 1:	glFormat = GL_RGBA;	break;
+			case 2:	glFormat = GL_RGBA16; break;
+			case 3:	glFormat = GL_RGBA16F; break;
+			case 4:	glFormat = GL_RGBA32F; break;
+			case 0: default: glFormat = GL_RGBA; break; // Changed below
 		}
 		// Set sender DirectX texture format
 		sender.ReleaseSender();
-		if(formatindex == 0)
+		if (selected == 0)
 			sender.SetSenderFormat(DXGI_FORMAT_B8G8R8A8_UNORM); // Default
 		else
 			sender.SetSenderFormat(sender.DX11format(glFormat)); // Selected
@@ -2145,55 +2175,9 @@ bool ofApp::SelectSenderFormat()
 		myFbo.allocate(senderWidth, senderHeight, glFormat);
 		return true;
 	}
-
 	// Cancel
 	return false;
 
-}
-
-// Message handler for sender format selection
-INT_PTR CALLBACK SenderFormat(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	UNREFERENCED_PARAMETER(lParam);
-	HWND hwndList = NULL;
-	char formats[5][128] ={ "Default", "8 bit RGBA", "16 bit RGBA", "16 bit RGBA float", "32 bit RGBA float"};
-
-	switch (message) {
-
-	case WM_INITDIALOG:
-		SetWindowTextA(hDlg, "Sender format");
-		hwndList = GetDlgItem(hDlg, IDC_IMAGE_FORMAT);
-		SendMessageA(hwndList, (UINT)CB_RESETCONTENT, 0, 0L);
-		for (int k = 0; k < 5; k++)
-			SendMessageA(hwndList, (UINT)CB_ADDSTRING, 0, (LPARAM)formats[k]);
-		SendMessageA(hwndList, CB_SETCURSEL, (WPARAM)formatindex, (LPARAM)0);
-		// Set topmost
-		SetWindowPos(hDlg, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-		return (INT_PTR)TRUE;
-
-	case WM_COMMAND:
-		// Combo box selection
-		if (HIWORD(wParam) == CBN_SELCHANGE) {
-			if ((HWND)lParam == GetDlgItem(hDlg, IDC_IMAGE_FORMAT)) {
-				formatindex = static_cast<unsigned int>(SendMessageA((HWND)lParam, (UINT)CB_GETCURSEL, (WPARAM)0, (LPARAM)0));
-			}
-		}
-
-		// Drop though if not selected
-		switch (LOWORD(wParam)) {
-		case IDOK:
-			EndDialog(hDlg, 1);
-			break;
-		case IDCANCEL:
-			EndDialog(hDlg, 0);
-			return (INT_PTR)TRUE;
-		default:
-			return (INT_PTR)FALSE;
-		}
-		break;
-	}
-
-	return (INT_PTR)FALSE;
 }
 
 #endif
@@ -2271,8 +2255,22 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				CheckDlgButton(hDlg, IDC_RESEND, BST_CHECKED);
 			else
 				CheckDlgButton(hDlg, IDC_RESEND, BST_UNCHECKED);
+			
 			// Re-sending name
 			SetDlgItemTextA(hDlg, IDC_RESEND_NAME, (LPCSTR)g_ReceiverName);
+
+			// Re-size
+			if (bResize)
+				CheckDlgButton(hDlg, IDC_RESIZE, BST_CHECKED);
+			else
+				CheckDlgButton(hDlg, IDC_RESIZE, BST_UNCHECKED);
+
+			sprintf_s(tmp, "%d", ResizeWidth);
+			SetDlgItemTextA(hDlg, IDC_RESIZE_WIDTH, (LPCSTR)tmp);
+
+			sprintf_s(tmp, "%d", ResizeHeight);
+			SetDlgItemTextA(hDlg, IDC_RESIZE_HEIGHT, (LPCSTR)tmp);
+
 
 		}
 		return (INT_PTR)TRUE;
@@ -2376,6 +2374,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			preset = 0;
 			imagetype = 0;
 			bResend = false;
+			bResize = false;
 			strcpy_s(g_ReceiverName, 256, "Spout Receiver");
 			SendMessage(hDlg, WM_INITDIALOG, 0, 0L);
 		}
@@ -2388,6 +2387,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			SecondsDuration = 0L;
 			bAudio = false;
 			bResend = false;
+			bResize = false;
 			codec = 0;
 			quality = 1;
 			preset = 0;
@@ -2411,9 +2411,13 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			preset = presetindex;
 			imagetype = imagetypeindex;
 			extension = imagetypes[imagetype];
-			if (IsDlgButtonChecked(hDlg, IDC_RESEND) == BST_CHECKED)
-				bResend = true;
+			if (IsDlgButtonChecked(hDlg, IDC_RESEND) == BST_CHECKED) bResend = true;
 			GetDlgItemTextA(hDlg, IDC_RESEND_NAME, (LPSTR)g_ReceiverName, 256);
+			if (IsDlgButtonChecked(hDlg, IDC_RESIZE) == BST_CHECKED) bResize = true;
+			GetDlgItemTextA(hDlg, IDC_RESIZE_WIDTH, (LPSTR)tmp, 256);
+			ResizeWidth = (unsigned int)atoi(tmp);
+			GetDlgItemTextA(hDlg, IDC_RESIZE_HEIGHT, (LPSTR)tmp, 256);
+			ResizeHeight = (unsigned int)atoi(tmp);
 			EndDialog(hDlg, 1);
 			break;
 

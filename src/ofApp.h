@@ -118,7 +118,7 @@ class ofApp : public ofBaseApp{
 		ofxSkyBox skybox{};
 		ofEasyCam easycam{};
 		ofImage myBoxImage{}; // Image for the sender cube
-		bool EnterSenderName(char* SenderName, char* caption);
+		bool EnterSenderName(char* name, const char* caption);
 		bool SelectSenderFormat();
 		float rotX = 0;
 		float rotY = 0;
