@@ -213,7 +213,7 @@ void ofApp::setup() {
 
 	ofBackground(0, 0, 0);
 
-	OpenSpoutConsole(); // Empty console for debugging
+	// OpenSpoutConsole(); // Empty console for debugging
 	// EnableSpoutLog(); // Log to console
 	// SetSpoutLogLevel(SpoutLogLevel::SPOUT_LOG_WARNING); // Log warnings only
 	
