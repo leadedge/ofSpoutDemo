@@ -107,6 +107,7 @@
 	11.03.24 - Sender
 				 SpoutMessageBox edit control for sender name entry
 				 SpoutMessageBox combo box control for sender format selection
+	27.03.24 - Receiver - enable Adjust and Save menu items only when connected
 			   Version 1.019
 
     =========================================================================
@@ -212,7 +213,7 @@ void ofApp::setup() {
 
 	ofBackground(0, 0, 0);
 
-	// OpenSpoutConsole(); // Empty console for debugging
+	OpenSpoutConsole(); // Empty console for debugging
 	// EnableSpoutLog(); // Log to console
 	// SetSpoutLogLevel(SpoutLogLevel::SPOUT_LOG_WARNING); // Log warnings only
 	
@@ -517,6 +518,10 @@ void ofApp::draw() {
 				sender.ReleaseSender();
 				sender.SetSenderName(g_ReceiverName);
 			}
+
+			// Enable Adjust menu when connected
+			menu->EnablePopupItem("Adjust", true);
+
 		}
 
 		// If re-sizing, draw to the resizing fbo
@@ -528,6 +533,7 @@ void ofApp::draw() {
 
 		// Shaders require rgba8 layout
 		if (glFormat == GL_RGBA8 || glFormat == GL_RGBA) {
+
 			// Activate shaders on the received texture
 			GLuint textureID = myTexture.getTextureData().textureID;
 			unsigned int width = receiver.GetSenderWidth();
@@ -976,6 +982,21 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 
 
 #ifdef BUILDRECEIVER
+
+	if (title == "WM_ENTERMENULOOP") {
+		// ofxWinMenu internal command
+		// Enable Adjust and Save menu items only when connected
+		if (receiver.IsConnected()) {
+			menu->EnablePopupItem("Adjust", true);
+			menu->EnablePopupItem("Save image", true);
+			menu->EnablePopupItem("Save video", true);
+		}
+		else {
+			menu->EnablePopupItem("Adjust", false);
+			menu->EnablePopupItem("Save image", false);
+			menu->EnablePopupItem("Save video", false);
+		}
+	}
 
 	//
 	// File Menu
