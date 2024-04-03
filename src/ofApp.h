@@ -111,9 +111,7 @@ class ofApp : public ofBaseApp{
 		void ReadInitFile(const char* initfile);
 		bool ConfirmFileSave(std::string savepath);
 		void SaveImageFile(std::string savepath, bool bInvert = false);
-		bool ReadTextureData(GLuint SourceID, GLuint SourceTarget,
-			unsigned int width, unsigned int height, void* dest,
-			GLenum GLformat, int nChannels);
+
 #else
 		ofxSkyBox skybox{};
 		ofEasyCam easycam{};

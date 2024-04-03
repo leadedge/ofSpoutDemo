@@ -34,7 +34,7 @@ IDI_ICON1 ICON "DATA/images/Spout.ico"
 // Dialog resources
 //
 
-IDD_OPTIONSBOX DIALOGEX 0, 0, 148, 190
+IDD_OPTIONSBOX DIALOGEX 0, 0, 148, 180
 STYLE DS_3DLOOK | DS_SHELLFONT | WS_CAPTION | WS_VISIBLE | WS_POPUP
 CAPTION "Options"
 FONT 9, "Ms Shell Dlg", 0, 0, 1
@@ -61,18 +61,14 @@ FONT 9, "Ms Shell Dlg", 0, 0, 1
     LTEXT           "Preset", -1, 18, 113, 21, 9, SS_LEFT, WS_EX_LEFT
     COMBOBOX        IDC_PRESET, 50, 111, 78, 30, CBS_DROPDOWN | CBS_HASSTRINGS, WS_EX_LEFT
 
-    GROUPBOX        "Sending", -1,          11, 130, 125, 35, 0, WS_EX_LEFT
+    GROUPBOX        "Sending", -1,          11, 130, 125, 25, 0, WS_EX_LEFT
     AUTOCHECKBOX    "Re-send", IDC_RESEND,  18, 140,  38,  8, BS_LEFTTEXT, WS_EX_LEFT
     EDITTEXT        IDC_RESEND_NAME,        60, 139,  70, 10, ES_AUTOHSCROLL, WS_EX_LEFT
-    AUTOCHECKBOX    "Re-size", IDC_RESIZE,  18, 152,  38,  8, BS_LEFTTEXT, WS_EX_LEFT
-    EDITTEXT        IDC_RESIZE_WIDTH,       60, 151,  30, 10, ES_AUTOHSCROLL, WS_EX_LEFT
-    LTEXT           " x ", -1,              90, 151,  10, 10, SS_LEFT, WS_EX_LEFT
-    EDITTEXT        IDC_RESIZE_HEIGHT,     100, 151,  30, 10, ES_AUTOHSCROLL, WS_EX_LEFT
 
-    DEFPUSHBUTTON   "OK",     IDOK,               12, 170,  30, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Cancel", IDCANCEL,           43, 170,  30, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Reset",  IDC_OPTIONS_RESET,  74, 170,  30, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Help",   IDC_OPTIONS_HELP,  105, 170,  30, 14, 0, WS_EX_LEFT
+    DEFPUSHBUTTON   "OK",     IDOK,               12, 160,  30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Cancel", IDCANCEL,           43, 160,  30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Reset",  IDC_OPTIONS_RESET,  74, 160,  30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Help",   IDC_OPTIONS_HELP,  105, 160,  30, 14, 0, WS_EX_LEFT
 
 }
 

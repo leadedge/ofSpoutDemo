@@ -62,12 +62,8 @@
 #define IDC_PRESET          40011
 #define IDC_RESEND          40012
 #define IDC_RESEND_NAME     40013
-#define IDC_RESIZE          40014
-#define IDC_RESIZE_WIDTH    40015
-#define IDC_RESIZE_HEIGHT   40016
-
-#define IDC_OPTIONS_RESET   40017
-#define IDC_OPTIONS_HELP    40018
+#define IDC_OPTIONS_RESET   40014
+#define IDC_OPTIONS_HELP    40015
 
 
 

@@ -108,6 +108,7 @@
 				 SpoutMessageBox edit control for sender name entry
 				 SpoutMessageBox combo box control for sender format selection
 	27.03.24 - Receiver - enable Adjust and Save menu items only when connected
+	03.04.24 - Remove ReadTextureData function and move to SpoutGL.cpp ReadTexturePixels
 			   Version 1.019
 
     =========================================================================
@@ -141,10 +142,6 @@ static INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
 static char g_ExePath[MAX_PATH]={0}; // Executable path
 static bool bResend = false; // Option to send received texture
 static char g_ReceiverName[256]={0}; // Re-sending name
-static bool bResize = false; // Change re-sending size
-static unsigned int ResizeWidth = 1920; // Starting resize width
-static unsigned int ResizeHeight = 1080; // Starting resize height
-
 static std::string extension = ".png"; // Capture type
 static bool bPrompt = false; // file name entry dialog
 static bool bShowFile = false; // show file name details after save
@@ -171,10 +168,6 @@ int old_preset = preset;
 int old_imagetype = imagetype;
 bool old_bResend = bResend;
 char old_ReceiverName[256]{0};
-bool old_bResize = bResize;
-unsigned int old_ResizeWidth = ResizeWidth;
-unsigned int old_ResizeHeight = ResizeHeight;
-
 
 //
 // Adjustment controls modeless dialog
@@ -305,7 +298,7 @@ void ofApp::setup() {
 	menu->AddPopupItem(hPopup, "Preview", false, false); // Unchecked, no auto-check
 	bFullScreen = false;
 	menu->AddPopupItem(hPopup, "Full screen", false, false); // Unchecked, no auto-check
-	menu->AddPopupItem(hPopup, "Show info", true); // Checked, auto-check
+	menu->AddPopupItem(hPopup, "Show info", true);  // Checked, auto-check
 #else
 	menu->AddPopupItem(hPopup, "Show info", true); // Checked, auto-check
 #endif
@@ -372,12 +365,6 @@ void ofApp::setup() {
 	// Set the sender name for re-sending
 	sender.SetSenderName(g_ReceiverName);
 
-	// Allocate an fbo for re-sizing
-	// Size is independent of the sender
-	// Starting size is 1920x1080, saved after changing options
-	// and retreived by ReadInitFile above
-	myFbo.allocate(ResizeWidth, ResizeHeight, glFormat);
-
 	// Needed for float image capture
 	ofDisableArbTex();
 
@@ -435,6 +422,9 @@ void ofApp::setup() {
 	controlArea.scaleFromCenter(scale, scale);
 	easycam.setControlArea(controlArea);
 #endif
+
+	// Centre messagebox dialogs on the window
+	SpoutMessageBoxWindow(ofGetWin32Window());
 
 	// Starting value for sender fps display
 	g_SenderFps = GetRefreshRate();
@@ -524,28 +514,16 @@ void ofApp::draw() {
 
 		}
 
-		// If re-sizing, draw to the resizing fbo
-		if (bResize) {
-			myFbo.begin();
-			myTexture.draw(0, 0, myFbo.getWidth(), myFbo.getHeight());
-			myFbo.end();
-		}
-
+		// Activate shaders on the received texture if the frame is new
+		// otherwise they repeat on the processed texture.
+		// Shaders have source and destination textures
+		// but the source texture can also be the destination
 		// Shaders require rgba8 layout
-		if (glFormat == GL_RGBA8 || glFormat == GL_RGBA) {
-
-			// Activate shaders on the received texture
+		if (receiver.IsFrameNew() && (glFormat == GL_RGBA8 || glFormat == GL_RGBA)) {
+	
 			GLuint textureID = myTexture.getTextureData().textureID;
-			unsigned int width = receiver.GetSenderWidth();
-			unsigned int height = receiver.GetSenderHeight();
-
-			// If re-sizing, shaders operate on the fbo
-			if (bResize) {
-				// fbo texture
-				textureID = myFbo.getTexture().getTextureData().textureID;
-				width = (unsigned int)myFbo.getWidth();
-				height = (unsigned int)myFbo.getHeight();
-			}
+			unsigned int width  = (unsigned int)myTexture.getWidth();
+			unsigned int height = (unsigned int)myTexture.getHeight();
 
 			// Shaders have source and destination textures
 			// but the source texture can also be the destination
@@ -589,7 +567,15 @@ void ofApp::draw() {
 				shaders.Mirror(textureID, width, height);
 			if (bSwap)
 				shaders.Swap(textureID, width, height);
-		}
+
+			// Re-send if the option is selected
+			if (bResend) {
+				sender.SendTexture(textureID,
+					myTexture.getTextureData().textureTarget,
+					width, height, false);
+			}
+
+		} // Endif new frame
 
 		// Add a new frame to video if recording
 		// Record at the sender dimensions
@@ -604,28 +590,7 @@ void ofApp::draw() {
 			}
 		}
 
-		// Re-send if the option is selected
-		if (bResend) {
-			if (bResize) {
-				// If re-sizing send the resizing fbo
-				myFbo.begin();
-				sender.SendFbo(myFbo.getId(), ResizeWidth, ResizeHeight, false);
-				myFbo.end();
-			}
-			else {
-				// Otherwise send the received texture
-				sender.SendTexture(myTexture.getTextureData().textureID,
-					myTexture.getTextureData().textureTarget,
-					(unsigned int)myTexture.getWidth(),
-					(unsigned int)myTexture.getHeight(), false);
-			}
-		}
-
-		// Draw received texture or fbo
-		if (bResize)
-			myFbo.draw(0, 0, ofGetWidth(), ofGetHeight());
-		else
-			myTexture.draw(0, 0, ofGetWidth(), ofGetHeight());
+		myTexture.draw(0, 0, ofGetWidth(), ofGetHeight());
 
 	} // endif ReceiveTexture
 
@@ -635,7 +600,7 @@ void ofApp::draw() {
 			ofSetColor(255);
 			str = "[";
 			str += receiver.GetSenderName();
-			str += "]  ";
+			str += "]  (";
 			str += ofToString(receiver.GetSenderWidth()); str += "x";
 			str += ofToString(receiver.GetSenderHeight());
 
@@ -646,13 +611,6 @@ void ofApp::draw() {
 				str += " - ";
 				str += receiver.GLformatName(receiver.GLDXformat());
 			}
-
-			if (bResize) {
-				str += "  (Resized to ";
-				str += ofToString(ResizeWidth); str += "x";
-				str += ofToString(ResizeHeight);
-			}
-
 			str += ")";
 			DrawString(str, 20, 30);
 			// GetSenderFrame() will return false for senders < 2.007
@@ -842,10 +800,12 @@ void ofApp::exit() {
 
 	// Close the sender or receiver on exit
 #ifdef BUILDRECEIVER
+
 	StopRecording();
 	receiver.ReleaseReceiver();
 	// Save capture and recording settings
 	WriteInitFile(g_Initfile);
+
 #else
 	sender.ReleaseSender();
 #endif
@@ -990,11 +950,15 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 			menu->EnablePopupItem("Adjust", true);
 			menu->EnablePopupItem("Save image", true);
 			menu->EnablePopupItem("Save video", true);
+			menu->EnablePopupItem("Preview", true);
+			menu->EnablePopupItem("Full screen", true);
 		}
 		else {
 			menu->EnablePopupItem("Adjust", false);
 			menu->EnablePopupItem("Save image", false);
 			menu->EnablePopupItem("Save video", false);
+			menu->EnablePopupItem("Preview", false);
+			menu->EnablePopupItem("Full screen", false);
 		}
 	}
 
@@ -1047,6 +1011,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 		datapath += "\\data\\videos";
 		ShellExecuteA(ofGetWin32Window(), "open", datapath.c_str(), NULL, NULL, SW_SHOWNORMAL);
 	}
+
 
 	// Key commands
 	// Snapshot - F12 key
@@ -1172,9 +1137,6 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 		old_imagetype = imagetype;
 		old_bResend = bResend;
 		strcpy_s(old_ReceiverName, 256, g_ReceiverName);
-		old_bResize = bResize;
-		old_ResizeWidth = ResizeWidth;
-		old_ResizeHeight = ResizeHeight;
 		if (!DialogBoxA(g_hInstance, MAKEINTRESOURCEA(IDD_OPTIONSBOX), g_hWnd, Options)) {
 			extension = old_extension;
 			bPrompt = old_bPrompt;
@@ -1189,17 +1151,12 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 			imagetype = old_imagetype;
 			bResend = old_bResend;
 			strcpy_s(g_ReceiverName, 256, old_ReceiverName);
-			bResize = old_bResize;
-			ResizeWidth = old_ResizeWidth;
-			ResizeHeight = old_ResizeHeight;
 		}
 		else {
 			// Release sender if option has been unchecked or the sender name is different
 			if (!bResend || strcmp(g_ReceiverName, old_ReceiverName) != 0)
 				sender.ReleaseSender();
 			sender.SetSenderName(g_ReceiverName);
-			// Re-allocate the fbo for re-sending size
-			myFbo.allocate(ResizeWidth, ResizeHeight, glFormat);
 		}
 
 	}
@@ -1754,7 +1711,7 @@ void ofApp::SaveImageFile(std::string name, bool bInvert)
 		unsigned int width = (unsigned int)myTexture.getWidth();
 		unsigned int height = (unsigned int)myTexture.getHeight();
 		float* fbuffer = new float[width*height*3];
-		ReadTextureData(myTexture.getTextureData().textureID,
+		receiver.ReadTexturePixels(myTexture.getTextureData().textureID,
 			myTexture.getTextureData().textureTarget,
 			width, height, fbuffer, glFormat, 3);
 		stbi_write_hdr(name.c_str(), width, height, 3, fbuffer);
@@ -1775,7 +1732,7 @@ void ofApp::SaveImageFile(std::string name, bool bInvert)
 			unsigned int width = (unsigned int)myTexture.getWidth();
 			unsigned int height = (unsigned int)myTexture.getHeight();
 			float* fbuffer = new float[width*height*3];
-			ReadTextureData(myTexture.getTextureData().textureID,
+			receiver.ReadTexturePixels(myTexture.getTextureData().textureID,
 				myTexture.getTextureData().textureTarget,
 				width, height, fbuffer, glFormat, 3);
 			stbi_write_hdr(name.c_str(), width, height, 3, fbuffer);
@@ -1832,37 +1789,6 @@ void ofApp::SaveImageFile(std::string name, bool bInvert)
 		SpoutMessageBox(g_hWnd, imagename.c_str(), "Saved image", MB_OK | MB_USERICON | MB_TOPMOST, 2000);
 
 }
-
-//--------------------------------------------------------------
-// Read texture pixels
-bool ofApp::ReadTextureData(GLuint SourceID, GLuint SourceTarget,
-	unsigned int width, unsigned int height, void* dest,
-	GLenum GLformat, int nChannels)
-{
-	if (glFormat == GL_RGBA16F || glFormat == GL_RGBA32F) {
-		glBindTexture(SourceTarget, SourceID);
-		// RGB data for float hdr images
-		if (nChannels == 3)
-			glGetTexImage(SourceTarget, 0, GL_RGB, GL_FLOAT, dest);
-		else
-			glGetTexImage(SourceTarget, 0, GL_RGBA, GL_FLOAT, dest);
-		glBindTexture(SourceTarget, 0);
-	}
-	else if (glFormat == GL_RGBA16) { // Bit depth 16 bits
-		glBindTexture(SourceTarget, SourceID);
-		glGetTexImage(SourceTarget, 0, GL_RGBA, GL_UNSIGNED_SHORT, dest);
-		glBindTexture(SourceTarget, 0);
-	}
-	else {
-		// Dest must be RGBA or RGB width x height
-		glBindTexture(SourceTarget, SourceID);
-		glGetTexImage(SourceTarget, 0, GL_RGBA, GL_UNSIGNED_BYTE, dest);
-		glBindTexture(SourceTarget, 0);
-	}
-
-	return true;
-}
-
 
 //--------------------------------------------------------------
 // Save a configuration file in the executable folder
@@ -1967,19 +1893,6 @@ void ofApp::WriteInitFile(const char* initfile)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resend", (LPCSTR)"0", (LPCSTR)initfile);
 
 	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Receivername", (LPCSTR)g_ReceiverName, (LPCSTR)initfile);
-	
-	// Re-size
-	if (bResize)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resize", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resize", (LPCSTR)"0", (LPCSTR)initfile);
-	
-	sprintf_s(tmp, MAX_PATH, "%6d", ResizeWidth);
-	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resizewidth", (LPCSTR)tmp, (LPCSTR)initfile);
-	
-	sprintf_s(tmp, MAX_PATH, "%6d", ResizeHeight);
-	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resizeheight", (LPCSTR)tmp, (LPCSTR)initfile);
-
 
 }
 
@@ -2055,12 +1968,6 @@ void ofApp::ReadInitFile(const char* initfile)
 	if (tmp[0]) bResend = (atoi(tmp) == 1);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Receivername", NULL, (LPSTR)tmp, 256, initfile);
 	if (tmp[0]) strcpy_s(g_ReceiverName, 256, tmp);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Resize", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bResize = (atoi(tmp) == 1);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Resizewidth", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) ResizeWidth = (unsigned int)atoi(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Resizeheight", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) ResizeHeight = (unsigned int)atoi(tmp);
 
 	// Check menu items
 	if (extension == ".tif") {
@@ -2280,19 +2187,6 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			// Re-sending name
 			SetDlgItemTextA(hDlg, IDC_RESEND_NAME, (LPCSTR)g_ReceiverName);
 
-			// Re-size
-			if (bResize)
-				CheckDlgButton(hDlg, IDC_RESIZE, BST_CHECKED);
-			else
-				CheckDlgButton(hDlg, IDC_RESIZE, BST_UNCHECKED);
-
-			sprintf_s(tmp, "%d", ResizeWidth);
-			SetDlgItemTextA(hDlg, IDC_RESIZE_WIDTH, (LPCSTR)tmp);
-
-			sprintf_s(tmp, "%d", ResizeHeight);
-			SetDlgItemTextA(hDlg, IDC_RESIZE_HEIGHT, (LPCSTR)tmp);
-
-
 		}
 		return (INT_PTR)TRUE;
 
@@ -2395,7 +2289,6 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			preset = 0;
 			imagetype = 0;
 			bResend = false;
-			bResize = false;
 			strcpy_s(g_ReceiverName, 256, "Spout Receiver");
 			SendMessage(hDlg, WM_INITDIALOG, 0, 0L);
 		}
@@ -2408,7 +2301,6 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			SecondsDuration = 0L;
 			bAudio = false;
 			bResend = false;
-			bResize = false;
 			codec = 0;
 			quality = 1;
 			preset = 0;
@@ -2434,11 +2326,6 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			extension = imagetypes[imagetype];
 			if (IsDlgButtonChecked(hDlg, IDC_RESEND) == BST_CHECKED) bResend = true;
 			GetDlgItemTextA(hDlg, IDC_RESEND_NAME, (LPSTR)g_ReceiverName, 256);
-			if (IsDlgButtonChecked(hDlg, IDC_RESIZE) == BST_CHECKED) bResize = true;
-			GetDlgItemTextA(hDlg, IDC_RESIZE_WIDTH, (LPSTR)tmp, 256);
-			ResizeWidth = (unsigned int)atoi(tmp);
-			GetDlgItemTextA(hDlg, IDC_RESIZE_HEIGHT, (LPSTR)tmp, 256);
-			ResizeHeight = (unsigned int)atoi(tmp);
 			EndDialog(hDlg, 1);
 			break;
 
