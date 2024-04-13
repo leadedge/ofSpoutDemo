@@ -109,7 +109,6 @@ class ofApp : public ofBaseApp{
 		std::string EnterFileName(int type);
 		void WriteInitFile(const char* initfile);
 		void ReadInitFile(const char* initfile);
-		bool ConfirmFileSave(std::string savepath);
 		void SaveImageFile(std::string savepath, bool bInvert = false);
 
 #else

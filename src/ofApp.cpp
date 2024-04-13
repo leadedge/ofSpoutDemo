@@ -108,8 +108,15 @@
 				 SpoutMessageBox edit control for sender name entry
 				 SpoutMessageBox combo box control for sender format selection
 	27.03.24 - Receiver - enable Adjust and Save menu items only when connected
-	03.04.24 - Remove ReadTextureData function and move to SpoutGL.cpp ReadTexturePixels
 			   Version 1.019
+	03.04.24 - Remove ReadTextureData function and move to SpoutGL.cpp ReadTexturePixels
+			   Remove resize option
+			   Centre messagebox dialogs on the window
+			   Receiver - Enable/disable menu items if no sender
+	13.04.24 - EnterFileName - corrected default data path double backslash
+			   EnterFileName - prevent topmost window hiding file entry dialog
+			   Remove ConfirmFileSave, use OFN_OVERWRITEPROMPT in EnterFileName
+			   Version 1.020
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -979,7 +986,6 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 				SpoutMessageBox(g_hWnd, str.c_str(), "Incorrect image type", MB_OK | MB_ICONWARNING | MB_TOPMOST);
 				return;
 			}
-			printf("Save Image [%s] - glFormat = 0x%X\n", name.c_str(), glFormat);
 			SaveImageFile(name);
 		}
 		else {
@@ -1595,12 +1601,16 @@ void ofApp::StopRecording()
 //
 std::string ofApp::EnterFileName(int type)
 {
+	// Prevent topmost window hiding file entry dialog
+	if (bTopmost)
+		SetWindowPos(g_hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
 	char filePath[MAX_PATH]={0};
 	if (type < 2) {
 		// Default video output path
 		if (g_OutputFile.empty()) {
 			g_OutputFile = g_ExePath; // exe folder
-			g_OutputFile += "\\data\\videos\\";
+			g_OutputFile += "Data\\videos\\";
 			g_OutputFile += senderName;
 			sprintf_s(filePath, MAX_PATH, g_OutputFile.c_str());
 		}
@@ -1609,7 +1619,7 @@ std::string ofApp::EnterFileName(int type)
 		// Default image output path
 		if (g_OutputImage.empty()) {
 			g_OutputImage = g_ExePath; // exe folder
-			g_OutputImage += "\\Data\\captures\\";
+			g_OutputImage += "Data\\captures\\";
 			g_OutputImage += senderName;
 			sprintf_s(filePath, MAX_PATH, g_OutputImage.c_str());
 		}
@@ -1650,28 +1660,17 @@ std::string ofApp::EnterFileName(int type)
 	// OFN_OVERWRITEPROMPT prompts for over-write
 	ofn.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
 	ofn.lpstrTitle = "Output File";
-	if (!GetSaveFileNameA(&ofn)) {
-		// Return to try again
-		return "";
-	}
+	BOOL bRet = GetSaveFileNameA(&ofn);
+
+	if (bTopmost)
+		SetWindowPos(g_hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+	// Return to try again for fail or cancel
+	if(!bRet) return "";
 
 	// User file name entry
 	return filePath;
 }
-
-//--------------------------------------------------------------
-bool ofApp::ConfirmFileSave(std::string savepath)
-{
-	if (_access(savepath.c_str(), 0) != -1) {
-		std::string message = savepath;
-		RemovePath(savepath);
-		message += " already exists\nDo you want to replace it?";
-		if (SpoutMessageBox(g_hWnd, message.c_str(), "Confirm file save", MB_YESNO | MB_ICONWARNING | MB_TOPMOST) != IDYES)
-			return false;
-	}
-	return true;
-}
-
 
 //--------------------------------------------------------------
 void ofApp::SaveImageFile(std::string name, bool bInvert)
@@ -1703,10 +1702,6 @@ void ofApp::SaveImageFile(std::string name, bool bInvert)
 					Change to HDR image type.", "Incorrect image type", MB_OK | MB_ICONWARNING | MB_TOPMOST);
 			return;
 		}
-
-		if (!ConfirmFileSave(name))
-			return;
-
 		// STB RGB float HDR
 		unsigned int width = (unsigned int)myTexture.getWidth();
 		unsigned int height = (unsigned int)myTexture.getHeight();
@@ -1725,8 +1720,6 @@ void ofApp::SaveImageFile(std::string name, bool bInvert)
 					Change to TIF or HDR image type.", "Incorrect file type", MB_OK | MB_ICONWARNING | MB_TOPMOST);
 			return;
 		}
-		if (!ConfirmFileSave(name))
-			return;
 		if (name.substr(pos) == ".hdr") {
 			// STB RGB float HDR
 			unsigned int width = (unsigned int)myTexture.getWidth();
@@ -1754,8 +1747,6 @@ void ofApp::SaveImageFile(std::string name, bool bInvert)
 					Change to PNG or TIF image type.", "Incorrect image type", MB_OK | MB_ICONWARNING | MB_TOPMOST);
 			return;
 		}
-		if (!ConfirmFileSave(name))
-			return;
 		ofShortImage myImage; // Bit depth 16 bits
 		myTexture.readToPixels(myImage.getPixels());
 		myImage.save(name); // save png or tif
@@ -1765,8 +1756,6 @@ void ofApp::SaveImageFile(std::string name, bool bInvert)
 		size_t pos = name.rfind(".");
 		if (name.substr(pos) == ".tif" || name.substr(pos) == ".png"
 			|| name.substr(pos) == ".jpg" || name.substr(pos) == ".bmp") {
-			if (!ConfirmFileSave(name))
-				return;
 			ofImage myImage; // Bit depth 8 bits
 			myTexture.readToPixels(myImage.getPixels());
 			myImage.save(name); // save tif, png, jpg, bmp
