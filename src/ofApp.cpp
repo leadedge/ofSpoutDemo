@@ -117,6 +117,8 @@
 			   EnterFileName - prevent topmost window hiding file entry dialog
 			   Remove ConfirmFileSave, use OFN_OVERWRITEPROMPT in EnterFileName
 			   Version 1.020
+	19.04.24 - Add colour temperature shader to SpoutShaders
+			   Version 1.021
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -183,22 +185,24 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 static HWND hwndAdjust = NULL;
 static ofApp* pThis = nullptr;
 // Statics for the dialog
-static float Brightness = 0.0;
-static float Contrast   = 1.0;
-static float Saturation = 1.0;
-static float Gamma      = 1.0;
-static float Blur       = 0.0;
-static float Sharpness  = 0.0;
-static float Sharpwidth = 3.0; // 3x3, 5x5, 7x7
-static bool bAdaptive   = false; // CAS adaptive sharpen
-static bool bFlip       = false;
-static bool bMirror     = false;
-static bool bSwap       = false;
+static float Brightness  = 0.0;
+static float Contrast    = 1.0;
+static float Saturation  = 1.0;
+static float Gamma       = 1.0;
+static float Temp        = 6500.0; // daylight
+static float Blur        = 0.0;
+static float Sharpness   = 0.0;
+static float Sharpwidth  = 3.0; // 3x3, 5x5, 7x7
+static bool bAdaptive    = false; // CAS adaptive sharpen
+static bool bFlip        = false;
+static bool bMirror      = false;
+static bool bSwap        = false;
 // 
 static float OldBrightness = 0.0;
 static float OldContrast   = 1.0;
 static float OldSaturation = 1.0;
 static float OldGamma      = 1.0;
+static float OldTemp       = 6500.0;
 static float OldBlur       = 0.0;
 static float OldSharpness  = 0.0;
 static float OldSharpwidth = 3.0;
@@ -548,7 +552,12 @@ void ofApp::draw() {
 					Brightness, Contrast, Saturation, Gamma);
 			}
 
-			// Sharpness 0 - 1   default 0
+			// Temperature : 3500 - 9500  (default 6500 daylight)
+			if (Temp != 6500.0) {
+				shaders.Temperature(textureID, textureID, width, height, Temp);
+			}
+
+			// Sharpness 0 - 1  (default 0)
 			// 0.001 - 0.002 msec
 			if (Sharpness > 0.0) {
 				if (bAdaptive) {
@@ -1184,6 +1193,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 				OldContrast   = Contrast;
 				OldSaturation = Saturation;
 				OldGamma      = Gamma;
+				OldTemp       = Temp;
 				OldBlur       = Blur;
 				OldSharpness  = Sharpness;
 				OldSharpwidth = Sharpwidth;
@@ -1837,6 +1847,8 @@ void ofApp::WriteInitFile(const char* initfile)
 	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Saturation", (LPCSTR)tmp, (LPCSTR)initfile);
 	sprintf_s(tmp, MAX_PATH, "%.3f", Gamma);
 	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Gamma", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Temp);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Temp", (LPCSTR)tmp, (LPCSTR)initfile);
 	sprintf_s(tmp, MAX_PATH, "%.3f", Blur);
 	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Blur", (LPCSTR)tmp, (LPCSTR)initfile);
 	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpness);
@@ -1930,6 +1942,8 @@ void ofApp::ReadInitFile(const char* initfile)
 	if (tmp[0]) Saturation = (float)atof(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Gamma", NULL, (LPSTR)tmp, 8, initfile);
 	if (tmp[0]) Gamma = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Temp", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0])Temp = (float)atof(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Blur", NULL, (LPSTR)tmp, 8, initfile);
 	if (tmp[0]) Blur = (float)atof(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpness", NULL, (LPSTR)tmp, 8, initfile);
@@ -2389,6 +2403,15 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 		sprintf_s(str1, 256, "%.3f", Gamma);
 		SetDlgItemTextA(hDlg, IDC_GAMMA_TEXT, (LPCSTR)str1);
 
+		hBar = GetDlgItem(hDlg, IDC_TEMPERATURE);
+		SendMessage(hBar, TBM_SETRANGEMIN, (WPARAM)1, (LPARAM)3500);
+		SendMessage(hBar, TBM_SETRANGEMAX, (WPARAM)1, (LPARAM)9500);
+		SendMessage(hBar, TBM_SETPAGESIZE, (WPARAM)1, (LPARAM)10);
+		iPos = (int)(Temp);
+		SendMessage(hBar, TBM_SETPOS, (WPARAM)1, (LPARAM)iPos);
+		sprintf_s(str1, 256, "%4.0f", Temp);
+		SetDlgItemTextA(hDlg, IDC_TEMPERATURE_TEXT, (LPCSTR)str1);
+
 		hBar = GetDlgItem(hDlg, IDC_SHARPNESS);
 		SendMessage(hBar, TBM_SETRANGEMIN, (WPARAM)1, (LPARAM)0);
 		SendMessage(hBar, TBM_SETRANGEMAX, (WPARAM)1, (LPARAM)100);
@@ -2467,6 +2490,13 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			sprintf_s(str1, 256, "%.3f", fValue);
 			SetDlgItemTextA(hDlg, IDC_GAMMA_TEXT, (LPCSTR)str1);
 		}
+		else if (hBar == GetDlgItem(hDlg, IDC_TEMPERATURE)) {
+			iPos = SendMessage(hBar, TBM_GETPOS, 0, 0);
+			fValue = ((float)iPos);
+			Temp = fValue;
+			sprintf_s(str1, 256, "%4.0f", fValue);
+			SetDlgItemTextA(hDlg, IDC_TEMPERATURE_TEXT, (LPCSTR)str1);
+		}
 		else if (hBar == GetDlgItem(hDlg, IDC_SHARPNESS)) {
 			iPos = SendMessage(hBar, TBM_GETPOS, 0, 0);
 			fValue = ((float)iPos)/100.0f;
@@ -2540,6 +2570,7 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			Contrast   = OldContrast;
 			Saturation = OldSaturation;
 			Gamma      = OldGamma;
+			Temp       = OldTemp;
 			Blur       = OldBlur;
 			Sharpness  = OldSharpness;
 			Sharpwidth = OldSharpwidth;
@@ -2555,6 +2586,7 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			Contrast   = 1.0; //  0 - 2 default 1
 			Saturation = 1.0; //  0 - 4 default 1
 			Gamma      = 1.0; //  0 - 2 default 1
+			Temp       = 6500.0; // 3500 - 9500 default 6500 (daylight)
 			Blur       = 0.0; //  0 - 4 default 0
 			Sharpness  = 0.0; //  0 - 1 default 0
 			Sharpwidth = 3.0; //  3,5,7 default 3
@@ -2575,6 +2607,7 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			Contrast   = OldContrast;
 			Saturation = OldSaturation;
 			Gamma      = OldGamma;
+			Temp       = OldTemp;
 			Blur       = OldBlur;
 			Sharpness  = OldSharpness;
 			Sharpwidth = OldSharpwidth;

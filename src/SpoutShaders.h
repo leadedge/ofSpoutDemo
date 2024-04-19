@@ -62,6 +62,10 @@ class SPOUT_DLLEXP spoutShaders {
 		// Swap RGBA <> BGRA
 		bool Swap(GLuint SourceID, unsigned int width, unsigned int height);
 
+		// Temperature
+		bool Temperature(GLuint SourceID, GLuint DestID,
+			unsigned int width, unsigned int height, float temp);
+
 		// Image adjust - brightness, contrast, saturation, gamma
 		bool Adjust(GLuint SourceID, GLuint DestID, 
 			unsigned int width, unsigned int height,
@@ -94,6 +98,7 @@ class SPOUT_DLLEXP spoutShaders {
 		GLuint m_flipProgram    = 0;
 		GLuint m_mirrorProgram  = 0;
 		GLuint m_swapProgram    = 0;
+		GLuint m_tempProgram    = 0;
 		GLuint m_brcosaProgram  = 0;
 		GLuint m_hBlurProgram   = 0;
 		GLuint m_vBlurProgram   = 0;
@@ -189,7 +194,7 @@ class SPOUT_DLLEXP spoutShaders {
 		"}";
 
 		//
-		// Adjust - brightness, contrast, saturation, gamma
+		// Adjust - brightness, contrast, saturation, gamma, temp
 		//
 		std::string m_brcosastr = "layout(rgba8, binding=0) uniform image2D src;\n" // Read/Write
 			"layout(rgba8, binding=1) uniform writeonly image2D dst;\n" // Write only
@@ -197,7 +202,6 @@ class SPOUT_DLLEXP spoutShaders {
 			"layout(location = 1) uniform float contrast;\n"
 			"layout(location = 2) uniform float saturation;\n"
 			"layout(location = 3) uniform float gamma;\n"
-			"\n"
 		"void main() {\n"
 			"// Adjust \n"
 			"vec4 c1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
@@ -218,6 +222,68 @@ class SPOUT_DLLEXP spoutShaders {
 			// Output with original alpha
 			"imageStore(dst, ivec2(gl_GlobalInvocationID.xy), vec4(c2, c1.a)); \n"
 		"}\n";
+
+		//
+		// Temperature 
+		// https://www.shadertoy.com/view/ltlcWN
+		//
+		std::string m_tempstr = "layout(rgba8, binding=0) uniform image2D src;\n"
+			"layout(rgba8, binding=1) uniform writeonly image2D dst;\n"
+			"layout(location = 0) uniform float temp;\n"
+			"\n"
+		"vec3 rgb2hsv(in vec3 c)\n"
+		"{\n"
+		"	vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);\n"
+		"	vec4 p = c.g < c.b ? vec4(c.bg, K.wz) : vec4(c.gb, K.xy);\n"
+		"	vec4 q = c.r < p.x ? vec4(p.xyw, c.r) : vec4(c.r, p.yzx);\n"
+		"	float d = q.x - min(q.w, q.y);\n"
+		"	float e = 1.0e-10;\n"
+		"	return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);\n"
+		"}\n"
+		"\n"
+		"vec3 hsv2rgb(in vec3 c)\n"
+		"{\n"
+		"	vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);\n"
+		"	vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);\n"
+		"	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);\n"
+		"}\n"
+		"\n"
+		"vec3 kelvin2rgb(in float K)\n"
+		"{\n"
+		"	float t = K / 100.0;\n"
+		"	vec3 o1, o2;\n"
+		"	float tg1 = t - 2.;\n"
+		"	float tb1 = t - 10.;\n"
+		"	float tr2 = t - 55.0;\n"
+		"	float tg2 = t - 50.0;\n"
+		"	o1.r = 1.;\n"
+		"	o1.g = (-155.25485562709179 - 0.44596950469579133 * tg1 + 104.49216199393888 * log(tg1)) / 255.;\n"
+		"	o1.b = (-254.76935184120902 + 0.8274096064007395 * tb1 + 115.67994401066147 * log(tb1)) / 255.;\n"
+		"	o1.b = mix(0., o1.b, step(2001., K));\n"
+		"	o2.r = (351.97690566805693 + 0.114206453784165 * tr2 - 40.25366309332127 * log(tr2)) / 255.;\n"
+		"	o2.g = (325.4494125711974 + 0.07943456536662342 * tg2 - 28.0852963507957 * log(tg2)) / 255.;\n"
+		"	o2.b = 1.;\n"
+		"	o1 = clamp(o1, 0., 1.);\n"
+		"	o2 = clamp(o2, 0., 1.);\n"
+		"	return mix(o1, o2, step(66., t));\n"
+		"}\n"
+		"\n"
+		"vec3 temperature(in vec3 c_in, in float K)\n"
+		"{\n"
+		"	vec3 chsv_in = rgb2hsv(c_in);\n"
+		"	vec3 c_temp = kelvin2rgb(K);\n"
+		"	vec3 c_mult = c_temp * c_in;\n"
+		"	vec3 chsv_mult = rgb2hsv(c_mult);\n"
+		"	return hsv2rgb(vec3(chsv_mult.x, chsv_mult.y, chsv_in.z));\n"
+		"}\n"
+		"\n"
+		"void main() {\n"
+			"vec4 c1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
+			"vec4 c2 = vec4(temperature(c1.rgb, temp), c1.a);\n"
+			"// Output \n"
+			"imageStore(dst, ivec2(gl_GlobalInvocationID.xy), c2);\n"
+		"}\n";
+
 
 		//
 		// Sharpen - unsharp mask

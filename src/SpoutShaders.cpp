@@ -35,6 +35,7 @@
 	09.11.23 - Add contrast adaptive sharpen
 	21.11.23 - ComputeShader
 			   Find the maximum number of work group units allowed to limit workgroup size
+	19.04.24 - Add colour temperature shader
 
 */
 
@@ -55,6 +56,7 @@ spoutShaders::~spoutShaders() {
 
 	if (m_copyProgram > 0) glDeleteProgram(m_copyProgram);
 	if (m_brcosaProgram > 0) glDeleteProgram(m_brcosaProgram);
+	if (m_tempProgram > 0) glDeleteProgram(m_tempProgram);
 	if (m_hBlurProgram > 0) glDeleteProgram(m_hBlurProgram);
 	if (m_vBlurProgram > 0) glDeleteProgram(m_vBlurProgram);
 	if (m_sharpenProgram > 0) glDeleteProgram(m_sharpenProgram);
@@ -102,6 +104,20 @@ bool spoutShaders::Swap(GLuint SourceID, unsigned int width, unsigned int height
 {
 	return ComputeShader(m_swapstr, m_swapProgram, SourceID, 0, width, height);
 }
+
+//---------------------------------------------------------
+// Function: Temperature
+//     Colour temperature
+//     https://www.shadertoy.com/view/ltlcWN
+//     https://en.wikipedia.org/wiki/Color_temperature
+//     temp -  3500 - 9500 : default 6500 (daylight)
+bool spoutShaders::Temperature(GLuint SourceID, GLuint DestID,
+	unsigned int width, unsigned int height, float temp)
+{
+	return ComputeShader(m_tempstr, m_tempProgram,
+		SourceID, DestID, width, height, temp);
+}
+
 
 //---------------------------------------------------------
 // Function: Adjust
@@ -218,6 +234,7 @@ void spoutShaders::SetGLformat(GLint glformat)
 		// All shaders have to be re-compiled
 		if (m_copyProgram     > 0) glDeleteProgram(m_copyProgram);
 		if (m_brcosaProgram   > 0) glDeleteProgram(m_brcosaProgram);
+		if (m_tempProgram     > 0) glDeleteProgram(m_tempProgram);
 		if (m_vBlurProgram    > 0) glDeleteProgram(m_vBlurProgram);
 		if (m_sharpenProgram  > 0) glDeleteProgram(m_sharpenProgram);
 		if (m_casProgram      > 0) glDeleteProgram(m_casProgram);
@@ -225,6 +242,7 @@ void spoutShaders::SetGLformat(GLint glformat)
 		if (m_kuwaharaProgram > 0) glDeleteProgram(m_kuwaharaProgram);
 		m_copyProgram     = 0;
 		m_brcosaProgram   = 0;
+		m_tempProgram     = 0;
 		m_sharpenProgram  = 0;
 		m_casProgram      = 0;
 		m_hBlurProgram    = 0;
