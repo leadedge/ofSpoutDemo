@@ -36,6 +36,9 @@
 	21.11.23 - ComputeShader
 			   Find the maximum number of work group units allowed to limit workgroup size
 	19.04.24 - Add colour temperature shader
+	24.04.24 - Add support for changing OpenGL format
+			   GL_RGBA8, GL_RGBA16, GL_RGBA16F, GL_RGBA32F
+			   Add SetShaderSource function to intialise shader strings
 
 */
 
@@ -48,19 +51,25 @@
 //
 
 spoutShaders::spoutShaders() {
+
+	// Initialize shader strings
+	SetGLformat(m_GLformat);
 	
 }
 
 
 spoutShaders::~spoutShaders() {
 
-	if (m_copyProgram > 0) glDeleteProgram(m_copyProgram);
-	if (m_brcosaProgram > 0) glDeleteProgram(m_brcosaProgram);
-	if (m_tempProgram > 0) glDeleteProgram(m_tempProgram);
-	if (m_hBlurProgram > 0) glDeleteProgram(m_hBlurProgram);
-	if (m_vBlurProgram > 0) glDeleteProgram(m_vBlurProgram);
-	if (m_sharpenProgram > 0) glDeleteProgram(m_sharpenProgram);
-	if (m_casProgram > 0) glDeleteProgram(m_casProgram);
+	if (m_copyProgram     > 0) glDeleteProgram(m_copyProgram);
+	if (m_swapProgram     > 0) glDeleteProgram(m_swapProgram);
+	if (m_flipProgram     > 0) glDeleteProgram(m_flipProgram);
+	if (m_mirrorProgram   > 0) glDeleteProgram(m_mirrorProgram);
+	if (m_brcosaProgram   > 0) glDeleteProgram(m_brcosaProgram);
+	if (m_tempProgram     > 0) glDeleteProgram(m_tempProgram);
+	if (m_hBlurProgram    > 0) glDeleteProgram(m_hBlurProgram);
+	if (m_vBlurProgram    > 0) glDeleteProgram(m_vBlurProgram);
+	if (m_sharpenProgram  > 0) glDeleteProgram(m_sharpenProgram);
+	if (m_casProgram      > 0) glDeleteProgram(m_casProgram);
 	if (m_kuwaharaProgram > 0) glDeleteProgram(m_kuwaharaProgram);
 }
 
@@ -205,17 +214,18 @@ bool spoutShaders::Kuwahara(GLuint SourceID, GLuint DestID,
 // https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)
 void spoutShaders::SetGLformat(GLint glformat)
 {
-	if (m_GLformat != glformat) {
 
-		GLint oldformat = m_GLformat;
-		std::string oldformatname = m_GLformatName;
+	SpoutLogNotice("spoutShaders::SetGLformat(0x%X)", glformat);
 
-		m_GLformat = glformat;
-		switch (m_GLformat) {
+	// For final notice of change
+	GLint oldformat = m_GLformat;
+	std::string oldformatname = m_GLformatName;
+
+	m_GLformat = glformat;
+	switch (m_GLformat) {
 		case GL_RGBA:
 		case GL_RGBA8:
 			// GL_RGBA not supported by shaders
-			m_GLformat = GL_RGBA8;
 			m_GLformatName = "rgba8";
 			break;
 		case GL_RGBA16:
@@ -229,33 +239,37 @@ void spoutShaders::SetGLformat(GLint glformat)
 			break;
 		default:
 			break;
-		}
-
-		// All shaders have to be re-compiled
-		if (m_copyProgram     > 0) glDeleteProgram(m_copyProgram);
-		if (m_brcosaProgram   > 0) glDeleteProgram(m_brcosaProgram);
-		if (m_tempProgram     > 0) glDeleteProgram(m_tempProgram);
-		if (m_vBlurProgram    > 0) glDeleteProgram(m_vBlurProgram);
-		if (m_sharpenProgram  > 0) glDeleteProgram(m_sharpenProgram);
-		if (m_casProgram      > 0) glDeleteProgram(m_casProgram);
-		if (m_hBlurProgram    > 0) glDeleteProgram(m_hBlurProgram);
-		if (m_kuwaharaProgram > 0) glDeleteProgram(m_kuwaharaProgram);
-		m_copyProgram     = 0;
-		m_brcosaProgram   = 0;
-		m_tempProgram     = 0;
-		m_sharpenProgram  = 0;
-		m_casProgram      = 0;
-		m_hBlurProgram    = 0;
-		m_vBlurProgram    = 0;
-		m_kuwaharaProgram = 0;
-
-		// No notice for GL_RGBA -> GL_RGBA8
-		if (glformat != GL_RGBA) {
-			SpoutLogNotice("spoutShaders::SetGLformat - shader format reset from 0x%X (%s) to 0x%X (%s)",
-				oldformat, oldformatname.c_str(), m_GLformat, m_GLformatName.c_str());
-		}
-
 	}
+
+	// All shaders have to be re-compiled
+	if (m_copyProgram     > 0) glDeleteProgram(m_copyProgram);
+	if (m_swapProgram     > 0) glDeleteProgram(m_swapProgram);
+	if (m_flipProgram     > 0) glDeleteProgram(m_flipProgram);
+	if (m_mirrorProgram   > 0) glDeleteProgram(m_mirrorProgram);
+	if (m_brcosaProgram   > 0) glDeleteProgram(m_brcosaProgram);
+	if (m_tempProgram     > 0) glDeleteProgram(m_tempProgram);
+	if (m_vBlurProgram    > 0) glDeleteProgram(m_vBlurProgram);
+	if (m_sharpenProgram  > 0) glDeleteProgram(m_sharpenProgram);
+	if (m_casProgram      > 0) glDeleteProgram(m_casProgram);
+	if (m_hBlurProgram    > 0) glDeleteProgram(m_hBlurProgram);
+	if (m_kuwaharaProgram > 0) glDeleteProgram(m_kuwaharaProgram);
+	m_copyProgram     = 0;
+	m_swapProgram     = 0;
+	m_flipProgram     = 0;
+	m_mirrorProgram   = 0;
+	m_brcosaProgram   = 0;
+	m_tempProgram     = 0;
+	m_sharpenProgram  = 0;
+	m_casProgram      = 0;
+	m_hBlurProgram    = 0;
+	m_vBlurProgram    = 0;
+	m_kuwaharaProgram = 0;
+
+	// Reset all shader strings
+	SetShaderSource(m_GLformatName);
+
+	SpoutLogNotice("spoutShaders::SetGLformat - shader format reset from 0x%X (%s) to 0x%X (%s)",
+			oldformat, oldformatname.c_str(), m_GLformat, m_GLformatName.c_str());
 
 }
 
@@ -271,9 +285,9 @@ void spoutShaders::CheckShaderFormat(std::string &shaderstr)
 	std::string formatname = shaderstr.substr(pos1, pos2-pos1);
 
 	// Default format name is "rbgb8"
-	// SetGLformat establishes m_GLformatName from the OpenGL format
+	// SetGLformat establishes GLformatName from the OpenGL format
 	// "rgba8" "rgba16" "rgba16f" or "rgba32f" supported
-	// Replace all occurrences of "rgba8" with m_GLformatName
+	// Replace all occurrences of "rgba8" with GLformatName
 	if (m_GLformatName != formatname) {
 		// Replace shader format name
 		size_t pos = 0;
@@ -285,7 +299,6 @@ void spoutShaders::CheckShaderFormat(std::string &shaderstr)
 			shaderstr.replace(pos, formatname.length(), m_GLformatName);
 		}
 	}
-	// printf("%s\n", shaderstr.c_str());
 }
 
 //---------------------------------------------------------
@@ -459,3 +472,410 @@ std::string spoutShaders::GetFileString(const char* filepath)
 	return logstr;
 }
 
+
+//---------------------------------------------------------
+// Function: SetShaderSource
+// Set all shader source strings
+// Used when the format changes
+void spoutShaders::SetShaderSource(std::string GLformatName)
+{
+	SpoutLogNotice("spoutShaders::SetShaderSource(%s)", GLformatName.c_str());
+
+	//
+	// Texture copy
+	//
+	m_copystr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n"
+		"layout(rgba8, binding=1) uniform writeonly image2D dst;\n"
+		"layout (location = 0) uniform bool flip;\n"
+		"layout (location = 1) uniform bool swap;\n"
+		"void main() {\n"
+		"// Copy \n"
+		"vec4 c = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
+		"uint ypos = gl_GlobalInvocationID.y;\n"
+		"if(flip) ypos = imageSize(src).y-ypos;\n" // Flip image option
+		// Texture copy with output alpha = 1
+		"if(swap) {\n" // Swap RGBA<>BGRA option
+		"    imageStore(dst, ivec2(gl_GlobalInvocationID.x, ypos), vec4(c.b,c.g,c.r,c.a));\n"
+		"}\n"
+		"else {\n"
+		"    imageStore(dst, ivec2(gl_GlobalInvocationID.x, ypos), vec4(c.r,c.g,c.b,c.a));\n"
+		"}\n"
+		"}";
+
+	//
+	// Flip in place
+	//
+	m_flipstr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n"
+		"layout (location = 0) uniform bool swap;\n"
+		"void main() {\n"
+		"// Flip \n"
+		"if(gl_GlobalInvocationID.y > imageSize(src).y/2)\n" // Half image
+		"    return;\n"
+		"uint ypos = imageSize(src).y-gl_GlobalInvocationID.y;\n" // Flip y position
+		"vec4 c0 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n" // This pixel
+		"vec4 c1 = imageLoad(src, ivec2(gl_GlobalInvocationID.x, ypos));\n" // Flip pixel
+		"if (swap) {\n" // Swap RGBA<>BGRA option
+		"c0 = vec4(c0.b, c0.g, c0.r, c0.a);\n"
+		"c1 = vec4(c1.b, c1.g, c1.r, c1.a);\n"
+		"}\n"
+		"imageStore(src, ivec2(gl_GlobalInvocationID.x, ypos), c0);\n" // Move this pixel to flip position
+		"imageStore(src, ivec2(gl_GlobalInvocationID.xy), c1);\n"  // Move flip pixel to this position
+		"}";
+
+	//
+	// Mirror in place
+	//
+	m_mirrorstr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n"
+		"layout (location = 0) uniform bool swap;\n"
+		"void main() {\n"
+		"// Mirror \n"
+		"if(gl_GlobalInvocationID.x > imageSize(src).x/2)\n"
+		"    return;\n"
+		"uint xpos = imageSize(src).x-gl_GlobalInvocationID.x;\n"
+		"vec4 c0 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
+		"vec4 c1 = imageLoad(src, ivec2(xpos, gl_GlobalInvocationID.y));\n"
+		"if (swap) {\n"
+		"c0 = vec4(c0.b, c0.g, c0.r, c0.a);\n"
+		"c1 = vec4(c1.b, c1.g, c1.r, c1.a);\n"
+		"}\n"
+		"imageStore(src, ivec2(xpos, gl_GlobalInvocationID.y), c0);\n"
+		"imageStore(src, ivec2(gl_GlobalInvocationID.xy), c1);\n"
+		"}";
+
+	//
+	// Swap RGBA <> BGRA
+	//
+	m_swapstr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n"
+		"void main() {\n"
+		"// Swap \n"
+		"vec4 c0 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
+		"imageStore(src, ivec2(gl_GlobalInvocationID.xy), vec4(c0.b, c0.g, c0.r, c0.a));\n"
+		"}";
+
+	//
+	// Adjust - brightness, contrast, saturation, gamma, temp
+	//
+	m_brcosastr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n" // Read/Write
+		"layout(" + GLformatName + ", binding=1) uniform writeonly image2D dst;\n" // Write only
+		"layout(location = 0) uniform float brightness;\n"
+		"layout(location = 1) uniform float contrast;\n"
+		"layout(location = 2) uniform float saturation;\n"
+		"layout(location = 3) uniform float gamma;\n"
+		"void main() {\n"
+		"// Adjust \n"
+		"vec4 c1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
+		"\n"
+		// Gamma (0 > 10) default 1
+		"vec3 c2 = pow(c1.rgb, vec3(1.0 / gamma)); // rgb\n"
+		"\n"
+		// Saturation (0 > 3) default 1
+		"float luminance = dot(c2, vec3(0.2125, 0.7154, 0.0721)); // weights sum to 1\n"
+		"c2 = mix(vec3(luminance), c2, vec3(saturation));\n"
+		"\n"
+		// Contrast (0 > 2) default
+		"c2 = (c2 - 0.5) * contrast + 0.5;\n"
+		"\n"
+		// Brightness (-1 > 1) default 0
+		"c2 += brightness;\n"
+		"\n"
+		// Output with original alpha
+		"imageStore(dst, ivec2(gl_GlobalInvocationID.xy), vec4(c2, c1.a)); \n"
+		"}\n";
+
+	//
+	// Temperature 
+	// https://www.shadertoy.com/view/ltlcWN
+	//
+	m_tempstr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n"
+		"layout(rgba8, binding=1) uniform writeonly image2D dst;\n"
+		"layout(location = 0) uniform float temp;\n"
+		"\n"
+		"vec3 rgb2hsv(in vec3 c)\n"
+		"{\n"
+		"	vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);\n"
+		"	vec4 p = c.g < c.b ? vec4(c.bg, K.wz) : vec4(c.gb, K.xy);\n"
+		"	vec4 q = c.r < p.x ? vec4(p.xyw, c.r) : vec4(c.r, p.yzx);\n"
+		"	float d = q.x - min(q.w, q.y);\n"
+		"	float e = 1.0e-10;\n"
+		"	return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);\n"
+		"}\n"
+		"\n"
+		"vec3 hsv2rgb(in vec3 c)\n"
+		"{\n"
+		"	vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);\n"
+		"	vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);\n"
+		"	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);\n"
+		"}\n"
+		"\n"
+		"vec3 kelvin2rgb(in float K)\n"
+		"{\n"
+		"	float t = K / 100.0;\n"
+		"	vec3 o1, o2;\n"
+		"	float tg1 = t - 2.;\n"
+		"	float tb1 = t - 10.;\n"
+		"	float tr2 = t - 55.0;\n"
+		"	float tg2 = t - 50.0;\n"
+		"	o1.r = 1.;\n"
+		"	o1.g = (-155.25485562709179 - 0.44596950469579133 * tg1 + 104.49216199393888 * log(tg1)) / 255.;\n"
+		"	o1.b = (-254.76935184120902 + 0.8274096064007395 * tb1 + 115.67994401066147 * log(tb1)) / 255.;\n"
+		"	o1.b = mix(0., o1.b, step(2001., K));\n"
+		"	o2.r = (351.97690566805693 + 0.114206453784165 * tr2 - 40.25366309332127 * log(tr2)) / 255.;\n"
+		"	o2.g = (325.4494125711974 + 0.07943456536662342 * tg2 - 28.0852963507957 * log(tg2)) / 255.;\n"
+		"	o2.b = 1.;\n"
+		"	o1 = clamp(o1, 0., 1.);\n"
+		"	o2 = clamp(o2, 0., 1.);\n"
+		"	return mix(o1, o2, step(66., t));\n"
+		"}\n"
+		"\n"
+		"vec3 temperature(in vec3 c_in, in float K)\n"
+		"{\n"
+		"	vec3 chsv_in = rgb2hsv(c_in);\n"
+		"	vec3 c_temp = kelvin2rgb(K);\n"
+		"	vec3 c_mult = c_temp * c_in;\n"
+		"	vec3 chsv_mult = rgb2hsv(c_mult);\n"
+		"	return hsv2rgb(vec3(chsv_mult.x, chsv_mult.y, chsv_in.z));\n"
+		"}\n"
+		"\n"
+		"void main() {\n"
+		"vec4 c1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
+		"vec4 c2 = vec4(temperature(c1.rgb, temp), c1.a);\n"
+		"// Output \n"
+		"imageStore(dst, ivec2(gl_GlobalInvocationID.xy), c2);\n"
+		"}\n";
+
+
+	//
+	// Sharpen - unsharp mask
+	//
+	m_sharpenstr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n"
+		"layout(rgba8, binding=1) uniform writeonly image2D dst;\n"
+		"layout(location = 0) uniform float sharpenwidth;\n"
+		"layout(location = 1) uniform float sharpenstrength;\n"
+		"\n"
+		"void main() {\n"
+		"// Sharpen \n"
+		// Original pixel
+		"vec4 orig = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
+		"\n"
+		// Get the blur neighbourhood 3x3 or 5x5
+		"float dx = sharpenwidth;\n"
+		"float dy = sharpenwidth;\n"
+		"\n"
+		"vec4 c1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(-dx, -dy));\n"
+		"vec4 c2 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, -dy));\n"
+		"vec4 c3 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(dx, -dy));\n"
+		"vec4 c4 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(-dx, 0.0));\n"
+		"vec4 c5 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(dx, 0.0));\n"
+		"vec4 c6 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(-dx, dy));\n"
+		"vec4 c7 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, dy));\n"
+		"vec4 c8 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(dx, dy));\n"
+		"\n"
+		// Gaussian blur filter
+		// [ 1, 2, 1 ]
+		// [ 2, 4, 2 ]
+		// [ 1, 2, 1 ]
+		//  c1 c2 c3
+		//  c4    c5
+		//  c6 c7 c8
+		"vec4 blur = ((c1 + c3 + c6 + c8) + 2.0 * (c2 + c4 + c5 + c7) + 4.0 * orig) / 16.0;\n"
+		// Subtract the blurred image from the original image
+		"vec4 coeff_blur = vec4(sharpenstrength);\n"
+		"vec4 coeff_orig = vec4(1.0) + coeff_blur;\n"
+		"vec4 c9 = coeff_orig * orig - coeff_blur * blur;\n"
+		"\n"
+		// Output
+		"imageStore(dst, ivec2(gl_GlobalInvocationID.xy), c9);\n"
+		"}\n";
+
+	//
+	// Gaussian blur
+	// Adapted from Openframeworks "09_gaussianBlurFilter" example
+	// https://openframeworks.cc/
+	//
+
+	//
+	// Horizontal Gaussian blur
+	//
+	m_hblurstr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n"
+		"layout(rgba8, binding=1) uniform writeonly image2D dst;\n"
+		"layout(location = 0) uniform float amount;\n"
+		"\n"
+		"void main() {\n"
+		"// H blur\n"
+		"vec4 c1 = 0.000229 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(amount*-4.0, 0.0));\n"
+		"vec4 c2 = 0.005977 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(amount*-3.0, 0.0));\n"
+		"vec4 c3 = 0.060598 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(amount*-2.0, 0.0));\n"
+		"vec4 c4 = 0.241732 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(amount*-1.0, 0.0));\n"
+		"vec4 c5 = 0.382928 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, 0.0));\n"
+		"vec4 c6 = 0.241732 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(amount*1.0, 0.0));\n"
+		"vec4 c7 = 0.060598 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(amount*2.0, 0.0));\n"
+		"vec4 c8 = 0.005977 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(amount*3.0, 0.0));\n"
+		"vec4 c9 = 0.000229 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(amount*4.0, 0.0));\n"
+		"\n"
+		// Output
+		"imageStore(dst, ivec2(gl_GlobalInvocationID.xy), (c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9));\n"
+		"\n"
+		"}\n";
+
+	//
+	// Vertical Gaussian blur
+	//
+	m_vblurstr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n"
+		"layout(rgba8, binding=1) uniform writeonly image2D dst;\n"
+		"layout(location = 0) uniform float amount;\n"
+		"\n"
+		"void main() {\n"
+		"// V blur\n"
+		"vec4 c1 = 0.000229 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, amount*-4.0));\n"
+		"vec4 c2 = 0.005977 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, amount*-3.0));\n"
+		"vec4 c3 = 0.060598 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, amount*-2.0));\n"
+		"vec4 c4 = 0.241732 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, amount*-1.0));\n"
+		"vec4 c5 = 0.382928 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, 0.0));\n"
+		"vec4 c6 = 0.241732 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, amount*1.0));\n"
+		"vec4 c7 = 0.060598 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, amount*2.0));\n"
+		"vec4 c8 = 0.005977 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, amount*3.0));\n"
+		"vec4 c9 = 0.000229 * imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, amount*4.0));\n"
+		"\n"
+		// Output
+		"imageStore(dst, ivec2(gl_GlobalInvocationID.xy), (c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9));\n"
+		"\n"
+		"}\n";
+
+	//
+	// Contrast Adaptive sharpening
+	//
+	// AMD FidelityFX https://gpuopen.com/fidelityfx-cas/
+	// Adapted from  https://www.shadertoy.com/view/ftsXzM
+	//
+	m_casstr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n"
+		"layout (location = 0) uniform float caswidth;\n"
+		"layout (location = 1) uniform float caslevel;\n"
+		//
+		"float luminance(in vec3 col)\n"
+		"{\n"
+		"	return dot(vec3(0.2126, 0.7152, 0.0722), col);\n"
+		"}\n"
+		"void main() {\n"
+		// Centre pixel (rgba)
+		"vec4 c0 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy));\n"
+		// Offsets 1, 2, 3
+		"float dx = caswidth;\n"
+		"float dy = caswidth;\n"
+		//
+		// Neighbourhood
+		//
+		//     b
+		//  a  x  c
+		//     d
+		//
+		// Centre pixel (rgb)
+		"vec3 col = imageLoad(src, ivec2(gl_GlobalInvocationID.xy)).rgb;\n" // x
+		"float max_g = luminance(col);\n"
+		"float min_g = luminance(col);\n"
+		//
+		"vec3 col1;\n"
+		"col1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(-dx, 0.0)).rgb;\n" // a
+		"max_g = max(max_g, luminance(col1));\n"
+		"min_g = min(min_g, luminance(col1));\n"
+		"vec3 colw = col1;\n"
+		//
+		"col1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, dy)).rgb;\n" // b
+		"max_g = max(max_g, luminance(col1));\n"
+		"min_g = min(min_g, luminance(col1));\n"
+		"colw += col1;\n"
+		//
+		"col1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(dx, 0.0)).rgb;\n" // c
+		"max_g = max(max_g, luminance(col1));\n"
+		"min_g = min(min_g, luminance(col1));\n"
+		"colw += col1;\n"
+		//
+		"col1 = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(0.0, dy)).rgb;\n" // d
+		"max_g = max(max_g, luminance(col1));\n"
+		"min_g = min(min_g, luminance(col1));\n"
+		"colw += col1;\n"
+		// 
+		// CAS algorithm
+		//
+		"float d_min_g = min_g;\n"
+		"float d_max_g = 1.0-max_g;\n"
+		"float A;\n"
+		"if (d_max_g < d_min_g) {\n"
+		"    A = d_max_g / max_g;\n"
+		"} else {\n"
+		"    A = d_min_g / max_g;\n"
+		"}\n"
+		"A = sqrt(A);\n"
+		"A *= mix(-0.125, -0.2, caslevel);\n" // level - CAS level 0-1
+		// Sharpened result
+		"vec3 col_out = (col+colw*A)/(1.0+4.0*A);\n"
+		// Output
+		"imageStore(src, ivec2(gl_GlobalInvocationID.xy), vec4(col_out, c0.a));\n"
+		"}";
+
+
+	//
+	// Kuwahara effect
+	// Adapted from : Jan Eric Kyprianidis (http://www.kyprianidis.com/)
+	//
+	m_kuwaharastr = "layout(" + GLformatName + ", binding=0) uniform image2D src;\n"
+		"layout(rgba8, binding=1) uniform writeonly image2D dst;\n"
+		"layout(location = 0) uniform float radius;\n"
+		"\n"
+		"void main() {\n"
+		"\n"
+		"	vec3 m[4];\n"
+		"	vec3 s[4];\n"
+		"	for (int j = 0; j < 4; ++j) {\n"
+		"		m[j] = vec3(0.0);\n"
+		"		s[j] = vec3(0.0);\n"
+		"	}\n"
+		"\n"
+		"	vec3 c;\n"
+		"	int ir = int(floor(radius));\n"
+		"	for (int j = -ir; j <= 0; ++j) {\n"
+		"		for (int i = -ir; i <= 0; ++i) {\n"
+		"			c = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j)).rgb;\n"
+		"			m[0] += c;\n"
+		"			s[0] += c * c;\n"
+		"		}\n"
+		"	}\n"
+		"\n"
+		"	for (int j = -ir; j <= 0; ++j) {\n"
+		"		for (int i = 0; i <= ir; ++i) {\n"
+		"			c = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j)).rgb;\n"
+		"			m[1] += c;\n"
+		"			s[1] += c * c;\n"
+		"		}\n"
+		"	}\n"
+		"\n"
+		"	for (int j = 0; j <= ir; ++j) {\n"
+		"		for (int i = 0; i <= ir; ++i) {\n"
+		"			c = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j)).rgb;\n"
+		"			m[2] += c;\n"
+		"			s[2] += c * c;\n"
+		"		}\n"
+		"	}\n"
+		"\n"
+		"	for (int j = 0; j <= ir; ++j) {\n"
+		"		for (int i = -ir; i <= 0; ++i) {\n"
+		"			c = imageLoad(src, ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j)).rgb;\n"
+		"			m[3] += c;\n"
+		"			s[3] += c * c;\n"
+		"		}\n"
+		"	}\n"
+		"\n"
+		"	float min_sigma2 = 1e+2;\n"
+		"	float n = float((radius+1)*(radius+1));\n"
+		"	for (int k = 0; k < 4; ++k) {\n"
+		"		m[k] /= n;\n"
+		"		s[k] = abs(s[k] / n - m[k] * m[k]);\n"
+		"		float sigma2 = s[k].r + s[k].g + s[k].b;\n"
+		"		if (sigma2 < min_sigma2) {\n"
+		"			min_sigma2 = sigma2;\n"
+		"			imageStore(dst, ivec2(gl_GlobalInvocationID.xy), vec4(m[k], 1.0));\n"
+		"		}\n"
+		"	}\n"
+		"}\n";
+}
+
+// =====================================================================================
