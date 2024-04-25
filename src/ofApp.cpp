@@ -118,6 +118,7 @@
 			   Remove ConfirmFileSave, use OFN_OVERWRITEPROMPT in EnterFileName
 			   Version 1.020
 	19.04.24 - Add colour temperature shader to SpoutShaders
+	24.04.24 - Add shader support for changing OpenGL format
 			   Version 1.021
 
     =========================================================================
@@ -497,6 +498,11 @@ void ofApp::draw() {
 
 			// Allocate an application texture with the same OpenGL format as the sender
 			// The received texture format determines image capture bit depth and type
+			// GL_RGBA	  0x1908
+			// GL_BGRA    0x08E1
+			// GL_RGBA16  0x805B
+			// GL_RGBA16F 0x881A
+			// GL_RGBA32F 0x8814
 			glFormat = receiver.GLDXformat();
 			myTexture.allocate(receiver.GetSenderWidth(), receiver.GetSenderHeight(), glFormat);
 
@@ -530,7 +536,9 @@ void ofApp::draw() {
 		// Shaders have source and destination textures
 		// but the source texture can also be the destination
 		// Shaders require rgba8 layout
-		if (receiver.IsFrameNew() && (glFormat == GL_RGBA8 || glFormat == GL_RGBA)) {
+		// LJ DEBUG
+		// if (receiver.IsFrameNew() && (glFormat == GL_RGBA8 || glFormat == GL_RGBA)) {
+		if (receiver.IsFrameNew()) {
 	
 			GLuint textureID = myTexture.getTextureData().textureID;
 			unsigned int width  = (unsigned int)myTexture.getWidth();
@@ -1180,6 +1188,8 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 	if (title == "Adjust") {
 		if (receiver.IsConnected()) {
 			// Shaders require rgba8 layout
+			// LJ DEBUG
+			/*
 			if (!(glFormat == GL_RGBA8 || glFormat == GL_RGBA)) {
 				std::string str = "Incompatible sender format (";
 				str += receiver.GLformatName(receiver.GLDXformat());
@@ -1187,6 +1197,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 				SpoutMessageBox(g_hWnd, str.c_str(), "Warning", MB_ICONWARNING | MB_OK);
 				return;
 			}
+			*/
 
 			if (!hwndAdjust) {
 				OldBrightness = Brightness;
