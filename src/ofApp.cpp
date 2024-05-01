@@ -119,6 +119,12 @@
 			   Version 1.020
 	19.04.24 - Add colour temperature shader to SpoutShaders
 	24.04.24 - Add shader support for changing OpenGL format
+	27.04.24 - Test information display with format namimg
+	29.04.24 - SpoutShaders - load shaders from resources for easier
+			   editing and debug of shader code and adding or change.
+	30.04.24 - Add bloom shader
+			   Revise shader adjust dialog and open on left side of window.
+			   Add GL_RGB10_A2 format for sender
 			   Version 1.021
 
     =========================================================================
@@ -192,6 +198,7 @@ static float Saturation  = 1.0;
 static float Gamma       = 1.0;
 static float Temp        = 6500.0; // daylight
 static float Blur        = 0.0;
+static float Bloom       = 0.0;
 static float Sharpness   = 0.0;
 static float Sharpwidth  = 3.0; // 3x3, 5x5, 7x7
 static bool bAdaptive    = false; // CAS adaptive sharpen
@@ -205,6 +212,7 @@ static float OldSaturation = 1.0;
 static float OldGamma      = 1.0;
 static float OldTemp       = 6500.0;
 static float OldBlur       = 0.0;
+static float OldBloom      = 0.0;
 static float OldSharpness  = 0.0;
 static float OldSharpwidth = 3.0;
 static bool OldAdaptive    = false;
@@ -389,12 +397,12 @@ void ofApp::setup() {
 	// Set the sender application starting OpenGL format
 	// Default DirectX format is DXGI_FORMAT_B8G8R8A8_UNORM
 	//       OpenGL                             Compatible DX11 format
+	//       GL_RGBA       8 bit (default)      (DXGI_FORMAT_B8G8R8A8_UNORM)
+	//       GL_RGBA8      8 bit                (DXGI_FORMAT_R8G8B8A8_UNORM)
+	//       GL_RGB10_A2  10 bit 2 bit alpha	(DXGI_FORMAT_R10G10B10A2_UNORM)
 	//       GL_RGBA16    16 bit				(DXGI_FORMAT_R16G16B16A16_UNORM)			
 	//       GL_RGBA16F   16 bit float			(DXGI_FORMAT_R16G16B16A16_FLOAT)
 	//       GL_RGBA32F   32 bit float			(DXGI_FORMAT_R32G32B32A32_FLOAT)
-	//       GL_RGB10_A2  10 bit 2 bit alpha	(DXGI_FORMAT_R10G10B10A2_UNORM)
-	//       GL_RGBA8      8 bit                (DXGI_FORMAT_R8G8B8A8_UNORM)
-	//       GL_RGBA       8 bit                (DXGI_FORMAT_R8G8B8A8_UNORM)
 	//
 	// glFormat = GL_RGBA16; // Example 16 bit rgba
 	// A compatible DirectX 11 shared texture format must be set
@@ -498,8 +506,9 @@ void ofApp::draw() {
 
 			// Allocate an application texture with the same OpenGL format as the sender
 			// The received texture format determines image capture bit depth and type
-			// GL_RGBA	  0x1908
+			// GL_RGBA	  0x1908 (default)
 			// GL_BGRA    0x08E1
+			// GL_RGB_A2  0x8059
 			// GL_RGBA16  0x805B
 			// GL_RGBA16F 0x881A
 			// GL_RGBA32F 0x8814
@@ -535,9 +544,6 @@ void ofApp::draw() {
 		// otherwise they repeat on the processed texture.
 		// Shaders have source and destination textures
 		// but the source texture can also be the destination
-		// Shaders require rgba8 layout
-		// LJ DEBUG
-		// if (receiver.IsFrameNew() && (glFormat == GL_RGBA8 || glFormat == GL_RGBA)) {
 		if (receiver.IsFrameNew()) {
 	
 			GLuint textureID = myTexture.getTextureData().textureID;
@@ -585,6 +591,10 @@ void ofApp::draw() {
 			if (Blur > 0.0)
 				shaders.Blur(textureID, textureID, width, height, Blur);
 
+			// Blur 0 - 1  (default 0)
+			if (Bloom > 0.0)
+				shaders.Bloom(textureID, width, height, Bloom);
+
 			if (bFlip)
 				shaders.Flip(textureID, width, height);
 			if (bMirror)
@@ -630,8 +640,8 @@ void ofApp::draw() {
 
 			// Received texture OpenGL format
 			// Default DirectX format is DXGI_FORMAT_B8G8R8A8_UNORM
-			// OpenGL name is GL_RGBA8. Do not show.
-			if (receiver.GLDXformat() != GL_RGBA8) {
+			// If OpenGL format is default GL_RGBA. Do not show.
+			if (receiver.GLDXformat() != GL_RGBA) {
 				str += " - ";
 				str += receiver.GLformatName(receiver.GLDXformat());
 			}
@@ -1187,18 +1197,6 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 	// Image adjustment
 	if (title == "Adjust") {
 		if (receiver.IsConnected()) {
-			// Shaders require rgba8 layout
-			// LJ DEBUG
-			/*
-			if (!(glFormat == GL_RGBA8 || glFormat == GL_RGBA)) {
-				std::string str = "Incompatible sender format (";
-				str += receiver.GLformatName(receiver.GLDXformat());
-				str += ")\nShaders require 8 bit rgba textures\n";
-				SpoutMessageBox(g_hWnd, str.c_str(), "Warning", MB_ICONWARNING | MB_OK);
-				return;
-			}
-			*/
-
 			if (!hwndAdjust) {
 				OldBrightness = Brightness;
 				OldContrast   = Contrast;
@@ -1206,6 +1204,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 				OldGamma      = Gamma;
 				OldTemp       = Temp;
 				OldBlur       = Blur;
+				OldBloom      = Bloom;
 				OldSharpness  = Sharpness;
 				OldSharpwidth = Sharpwidth;
 				OldAdaptive   = bAdaptive;
@@ -1339,7 +1338,8 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 			str  = "Sender name   - set a different sender name\n";
 			str += "Sender format - sets the DirectX shared texture format\n";
 			str +="    Default             DXGI_FORMAT_B8G8R8A8_UNORM\n";
-			str +="    GL_RGBA          DXGI_FORMAT_R8G8B8A8_UNORM\n";
+			str +="    GL_RGBA         DXGI_FORMAT_R8G8B8A8_UNORM\n";
+			str +="    GL_RGB_A2      DXGI_FORMAT_R10G10B10A2_UNORM\n";
 			str +="    GL_RGBA16      DXGI_FORMAT_R16G16B16A16_UNORM\n";
 			str +="    GL_RGBA16F    DXGI_FORMAT_R16G16B16A16_FLOAT\n";
 			str +="    GL_RGBA32F    DXGI_FORMAT_R32G32B32A32_FLOAT\n";
@@ -1694,7 +1694,7 @@ std::string ofApp::EnterFileName(int type)
 }
 
 //--------------------------------------------------------------
-void ofApp::SaveImageFile(std::string name, bool bInvert)
+void ofApp::SaveImageFile(std::string name)
 {
 	// Add the default extension if none entered
 	std::size_t pos = name.rfind('.');
@@ -1717,7 +1717,7 @@ void ofApp::SaveImageFile(std::string name, bool bInvert)
 	if (glFormat == GL_RGBA32F) {
 		// HDR format
 		// see: https://booksite.elsevier.com/samplechapters/9780123749147/02~Chapter_3.pdf
-		size_t pos = name.rfind(".");
+		pos = name.rfind(".");
 		if (name.substr(pos) != ".hdr") {
 			SpoutMessageBox(g_hWnd, "High dynamic range format is required\nfor 32 bit floating point textures.\n\
 					Change to HDR image type.", "Incorrect image type", MB_OK | MB_ICONWARNING | MB_TOPMOST);
@@ -1735,7 +1735,7 @@ void ofApp::SaveImageFile(std::string name, bool bInvert)
 	}
 	else if (glFormat == GL_RGBA16F) {
 		// 16 bit RGBA float - tif and hdr
-		size_t pos = name.rfind(".");
+		pos = name.rfind(".");
 		if (!(name.substr(pos) == ".tif" || name.substr(pos) == ".hdr")) {
 			SpoutMessageBox(g_hWnd, "TIF or HDR are the only image formats\nsupported for 16 bit float textures\n\
 					Change to TIF or HDR image type.", "Incorrect file type", MB_OK | MB_ICONWARNING | MB_TOPMOST);
@@ -1754,32 +1754,32 @@ void ofApp::SaveImageFile(std::string name, bool bInvert)
 		}
 		else {
 			// Freeimage rgba tif
-			ofFloatImage myImage; // Float pixels
-			myTexture.readToPixels(myImage.getPixels());
-			myImage.save(name); // save png or tif
+			ofFloatImage myimage; // Float pixels
+			myTexture.readToPixels(myimage.getPixels());
+			myimage.save(name); // save png or tif
 		}
 	}
 	else if (glFormat == GL_RGBA16) {
 		// TIF and PNG supported
 		// 16 bit RGBA - png or tif
-		size_t pos = name.rfind(".");
+		pos = name.rfind(".");
 		if (!(name.substr(pos) == ".tif" || name.substr(pos) == ".png")) {
 			SpoutMessageBox(g_hWnd, "PNG or TIF are the only image formats supported for 16 bit unsigned textures\n\
 					Change to PNG or TIF image type.", "Incorrect image type", MB_OK | MB_ICONWARNING | MB_TOPMOST);
 			return;
 		}
-		ofShortImage myImage; // Bit depth 16 bits
-		myTexture.readToPixels(myImage.getPixels());
-		myImage.save(name); // save png or tif
+		ofShortImage myimage; // Bit depth 16 bits
+		myTexture.readToPixels(myimage.getPixels());
+		myimage.save(name); // save png or tif
 	}
 	else if (glFormat == GL_RGBA || glFormat == GL_RGBA8) {
 		// 8 bit rgba - png, tif, jpg, bmp
-		size_t pos = name.rfind(".");
+		pos = name.rfind(".");
 		if (name.substr(pos) == ".tif" || name.substr(pos) == ".png"
 			|| name.substr(pos) == ".jpg" || name.substr(pos) == ".bmp") {
-			ofImage myImage; // Bit depth 8 bits
-			myTexture.readToPixels(myImage.getPixels());
-			myImage.save(name); // save tif, png, jpg, bmp
+			ofImage myimage; // Bit depth 8 bits
+			myTexture.readToPixels(myimage.getPixels());
+			myimage.save(name); // save tif, png, jpg, bmp
 		}
 	}
 	else {
@@ -1862,6 +1862,8 @@ void ofApp::WriteInitFile(const char* initfile)
 	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Temp", (LPCSTR)tmp, (LPCSTR)initfile);
 	sprintf_s(tmp, MAX_PATH, "%.3f", Blur);
 	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Blur", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Bloom);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Bloom", (LPCSTR)tmp, (LPCSTR)initfile);
 	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpness);
 	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Sharpness", (LPCSTR)tmp, (LPCSTR)initfile);
 	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpwidth);
@@ -1957,6 +1959,8 @@ void ofApp::ReadInitFile(const char* initfile)
 	if (tmp[0])Temp = (float)atof(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Blur", NULL, (LPSTR)tmp, 8, initfile);
 	if (tmp[0]) Blur = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Bloom", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Bloom = (float)atof(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpness", NULL, (LPSTR)tmp, 8, initfile);
 	if (tmp[0]) Sharpness = (float)atof(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpwidth", NULL, (LPSTR)tmp, 8, initfile);
@@ -2082,17 +2086,19 @@ bool ofApp::SelectSenderFormat()
 {
 	std::vector<std::string> items;
 	// "Default", "8 bit RGBA", "16 bit RGBA", "16 bit RGBA float", "32 bit RGBA float"
-	items.push_back("Default"); // DXGI_FORMAT_B8G8R8A8_UNORM
-	items.push_back("8 bit RGBA"); // DXGI_FORMAT_R8G8B8A8_UNORM
+	items.push_back("Default");       // DXGI_FORMAT_B8G8R8A8_UNORM
+	items.push_back("8 bit RGBA");    // DXGI_FORMAT_R8G8B8A8_UNORM
+	items.push_back("10 bit RGB A2"); // DXGI_FORMAT_R10G10B10A2_UNORM
 	items.push_back("16 bit RGBA");
 	items.push_back("16 bit RGBA float");
 	items.push_back("32 bit RGBA float");
 	int selected = 0;
 	switch (glFormat) {
-		case GL_RGBA:    selected = 1;	break;
-		case GL_RGBA16:	 selected = 2; break;
-		case GL_RGBA16F: selected = 3; break;
-		case GL_RGBA32F: selected = 4; break;
+		case GL_RGBA:     selected = 1;	break;
+		case GL_RGB10_A2: selected = 2; break;
+		case GL_RGBA16:	  selected = 3; break;
+		case GL_RGBA16F:  selected = 4; break;
+		case GL_RGBA32F:  selected = 5; break;
 		default: selected = 0; break;
 	}
 	if (sender.GetDX11format() == DXGI_FORMAT_B8G8R8A8_UNORM) // default
@@ -2101,10 +2107,11 @@ bool ofApp::SelectSenderFormat()
 	if (SpoutMessageBox(NULL, NULL, "Sender format", MB_ICONINFORMATION | MB_OKCANCEL, items, selected) == IDOK) {
 		switch (selected) {
 			// Default DirectX output format
-			case 1:	glFormat = GL_RGBA;	break;
-			case 2:	glFormat = GL_RGBA16; break;
-			case 3:	glFormat = GL_RGBA16F; break;
-			case 4:	glFormat = GL_RGBA32F; break;
+			case 1:	glFormat = GL_RGBA;     break;
+			case 2:	glFormat = GL_RGB10_A2; break;
+			case 3:	glFormat = GL_RGBA16;   break;
+			case 4:	glFormat = GL_RGBA16F;  break;
+			case 5:	glFormat = GL_RGBA32F;  break;
 			case 0: default: glFormat = GL_RGBA; break; // Changed below
 		}
 		// Set sender DirectX texture format
@@ -2366,12 +2373,33 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 	HWND hBar = NULL;
 	LRESULT iPos = 0;
 	float fValue = 0.0f;
+	RECT wrect{};
+	RECT drect{};
+	int x = 0;
+	int y = 0;
+	bool bReopen = false;
 
 	switch (message) {
 
 	case WM_INITDIALOG:
 
+		// Position to the left of the application window centre
+		// so the effects can be seen, except for "Restore" and "Reset".
+		// bReopen is initialized again when the dialog opens.
+		if (!bReopen) {
+			GetWindowRect(pThis->g_hWnd, &wrect);
+			GetWindowRect(hDlg, &drect);
+			x = wrect.left-(drect.right-drect.left)/2;
+			// If too far left, centre on the window
+			if (x < 0)
+				x = wrect.left+((wrect.right-wrect.left)-(drect.right-drect.left))/2;
+			y = wrect.top+((wrect.bottom-wrect.top)-(drect.bottom-drect.top))/2;
+			SetWindowPos(hDlg, NULL, x, y, 0, 0, SWP_NOSIZE);
+		}
+
+		//
 		// Set the scroll bar limits and text
+		//
 
 		// Brightness  -1 - 0 - 1 default 0
 		// Range 2 Brightness*400 - 200
@@ -2440,6 +2468,15 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 		SendMessage(hBar, TBM_SETPOS, (WPARAM)1, (LPARAM)iPos);
 		sprintf_s(str1, 256, "%.3f", Blur);
 		SetDlgItemTextA(hDlg, IDC_BLUR_TEXT, (LPCSTR)str1);
+
+		hBar = GetDlgItem(hDlg, IDC_BLOOM);
+		SendMessage(hBar, TBM_SETRANGEMIN, (WPARAM)1, (LPARAM)0);
+		SendMessage(hBar, TBM_SETRANGEMAX, (WPARAM)1, (LPARAM)100);
+		SendMessage(hBar, TBM_SETPAGESIZE, (WPARAM)1, (LPARAM)10);
+		iPos = (int)(Bloom * 100.0f);
+		SendMessage(hBar, TBM_SETPOS, (WPARAM)1, (LPARAM)iPos);
+		sprintf_s(str1, 256, "%.3f", Bloom);
+		SetDlgItemTextA(hDlg, IDC_BLOOM_TEXT, (LPCSTR)str1);
 
 		// Sharpness width radio buttons
 		// 3x3, 5x5, 7x7
@@ -2522,6 +2559,13 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			sprintf_s(str1, 256, "%.3f", fValue);
 			SetDlgItemTextA(hDlg, IDC_BLUR_TEXT, (LPCSTR)str1);
 		}
+		else if (hBar == GetDlgItem(hDlg, IDC_BLOOM)) {
+			iPos = SendMessage(hBar, TBM_GETPOS, 0, 0);
+			fValue = ((float)iPos) / 100.0f;
+			Bloom = fValue;
+			sprintf_s(str1, 256, "%.3f", fValue);
+			SetDlgItemTextA(hDlg, IDC_BLOOM_TEXT, (LPCSTR)str1);
+		}
 		break;
 
 	case WM_DESTROY:
@@ -2583,12 +2627,14 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			Gamma      = OldGamma;
 			Temp       = OldTemp;
 			Blur       = OldBlur;
+			Bloom      = OldBloom;
 			Sharpness  = OldSharpness;
 			Sharpwidth = OldSharpwidth;
 			bAdaptive  = OldAdaptive;
 			bFlip      = OldFlip;
 			bMirror    = OldMirror;
 			bSwap      = OldSwap;
+			bReopen    = true;
 			SendMessage(hDlg, WM_INITDIALOG, 0, 0L);
 			break;
 
@@ -2599,12 +2645,14 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			Gamma      = 1.0; //  0 - 2 default 1
 			Temp       = 6500.0; // 3500 - 9500 default 6500 (daylight)
 			Blur       = 0.0; //  0 - 4 default 0
+			Bloom      = 0.0; //  0 - 1 default 0
 			Sharpness  = 0.0; //  0 - 1 default 0
 			Sharpwidth = 3.0; //  3,5,7 default 3
 			bAdaptive  = false;
 			bFlip      = false;
 			bMirror    = false;
 			bSwap      = false;
+			bReopen    = true;
 			SendMessage(hDlg, WM_INITDIALOG, 0, 0L);
 			break;
 
@@ -2620,6 +2668,7 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			Gamma      = OldGamma;
 			Temp       = OldTemp;
 			Blur       = OldBlur;
+			Bloom      = OldBloom;
 			Sharpness  = OldSharpness;
 			Sharpwidth = OldSharpwidth;
 			bAdaptive  = OldAdaptive;

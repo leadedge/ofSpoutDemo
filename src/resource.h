@@ -1,7 +1,7 @@
 
 //
 // Enable this define to create a receiver rather than a sender
-#define BUILDRECEIVER
+// #define BUILDRECEIVER
 //
 
 
@@ -45,11 +45,13 @@
 #define IDC_MIRROR           30007
 #define IDC_BLUR             30008
 #define IDC_BLUR_TEXT        30009
-#define IDC_SHARPNESS_3x3    30010
-#define IDC_SHARPNESS_5x5    30011
-#define IDC_SHARPNESS_7x7    30012
-#define IDC_SWAP             30013
-#define IDC_ADAPTIVE         30014
+#define IDC_BLOOM            30010
+#define IDC_BLOOM_TEXT       30011
+#define IDC_SHARPNESS_3x3    30012
+#define IDC_SHARPNESS_5x5    30013
+#define IDC_SHARPNESS_7x7    30014
+#define IDC_SWAP             30015
+#define IDC_ADAPTIVE         30016
 
 #define IDC_IMAGE_TYPE      40000
 #define IDC_PROMPT          40001

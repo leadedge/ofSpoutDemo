@@ -109,7 +109,7 @@ class ofApp : public ofBaseApp{
 		std::string EnterFileName(int type);
 		void WriteInitFile(const char* initfile);
 		void ReadInitFile(const char* initfile);
-		void SaveImageFile(std::string savepath, bool bInvert = false);
+		void SaveImageFile(std::string savepath);
 
 #else
 		ofxSkyBox skybox{};
