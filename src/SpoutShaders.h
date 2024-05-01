@@ -41,6 +41,24 @@
 
 using namespace spoututils;
 
+//
+// Shader resource re-definitions
+//
+// Definitions here are duplicated from SpoutShaders.rc
+// to avoid a requiring a separate resource header file
+#define IDC_SHADERFILE0		1000 // copy
+#define IDC_SHADERFILE1		1001 // flip
+#define IDC_SHADERFILE2		1002 // mirror
+#define IDC_SHADERFILE3		1003 // swap
+#define IDC_SHADERFILE4		1004 // temp
+#define IDC_SHADERFILE5		1005 // brcosa
+#define IDC_SHADERFILE6		1006 // hblur
+#define IDC_SHADERFILE7		1007 // vblur
+#define IDC_SHADERFILE8		1008 // bloom
+#define IDC_SHADERFILE9		1009 // sharpen
+#define IDC_SHADERFILE10	1010 // cas
+#define IDC_SHADERFILE11	1011 // kuwahara
+
 class SPOUT_DLLEXP spoutShaders {
 
 	public:
@@ -76,6 +94,10 @@ class SPOUT_DLLEXP spoutShaders {
 		bool Blur(GLuint SourceID, GLuint DestID,
 			unsigned int width, unsigned int height, float amount);
 
+		// Bloom effect
+		bool Bloom(GLuint SourceID,
+			unsigned int width, unsigned int height, float amount);
+
 		// Unsharp mask sharpen
 		bool Sharpen(GLuint SourceID, GLuint DestID, 
 			unsigned int width, unsigned int height,
@@ -91,10 +113,10 @@ class SPOUT_DLLEXP spoutShaders {
 
 		// Shader format
 		void SetGLformat(GLint glformat);
-		void CheckShaderFormat(std::string &shaderstr);
 
 	protected :
 
+		void CheckShaderFormat(std::string& shaderstr);
 		bool ComputeShader(std::string &shader, GLuint &program, 
 			GLuint SourceID, GLuint DestID, 
 			unsigned int width, unsigned int height,
@@ -102,37 +124,39 @@ class SPOUT_DLLEXP spoutShaders {
 			float uniform2 = -1.0, float uniform3 = -1.0);
 		GLuint CreateComputeShader(std::string shader, unsigned int nWgX, unsigned int nWgY);
 		std::string GetFileString(const char* filepath); // Get shader string from file
-		void SetShaderSource(std::string GLformatName); // Initialize source strings
+		std::string LoadResourceFile(int index);  // Load shader string from resources
 
 		// Global program identifiers
-		GLuint m_copyProgram    = 0;
-		GLuint m_flipProgram    = 0;
-		GLuint m_mirrorProgram  = 0;
-		GLuint m_swapProgram    = 0;
-		GLuint m_tempProgram    = 0;
-		GLuint m_brcosaProgram  = 0;
-		GLuint m_hBlurProgram   = 0;
-		GLuint m_vBlurProgram   = 0;
-		GLuint m_sharpenProgram = 0;
-		GLuint m_casProgram     = 0;
+		GLuint m_copyProgram     = 0;
+		GLuint m_flipProgram     = 0;
+		GLuint m_mirrorProgram   = 0;
+		GLuint m_swapProgram     = 0;
+		GLuint m_tempProgram     = 0;
+		GLuint m_brcosaProgram   = 0;
+		GLuint m_hBlurProgram    = 0;
+		GLuint m_vBlurProgram    = 0;
+		GLuint m_sharpenProgram  = 0;
+		GLuint m_casProgram      = 0;
 		GLuint m_kuwaharaProgram = 0;
+		GLuint m_bloomProgram    = 0;
 
 		// Formats
 		GLint m_GLformat = GL_RGBA8;
 		std::string m_GLformatName = "rgba8";
 
-		// Shader strings
+		// Shader source loaded from resources
 		std::string m_copystr;
 		std::string m_flipstr;
 		std::string m_mirrorstr;
 		std::string m_swapstr;
-		std::string m_brcosastr;
 		std::string m_tempstr;
-		std::string m_sharpenstr;
+		std::string m_brcosastr;
 		std::string m_hblurstr;
 		std::string m_vblurstr;
+		std::string m_sharpenstr;
 		std::string m_casstr;
 		std::string m_kuwaharastr;
+		std::string m_bloomstr;
 
 };
 
