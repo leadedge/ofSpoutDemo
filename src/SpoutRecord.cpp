@@ -8,6 +8,8 @@
 // Revisions
 //		26-08-23 - Initial class
 //		01.09.23 - Add quality and preset
+//		02.05.24 - Add function comments to header file
+//		03.05.24 - Add SetChroma - chroma subsampling option
 //
 // =========================================================================
 // 
@@ -125,7 +127,7 @@ bool spoutRecord::Start(std::string ffmpegPath, std::string OutputFile,
 	// Input raw video
 	args += " -f rawvideo -vcodec rawvideo";
 
-	// Input pixel format bgra (RGBA pixels)
+	// INPUT pixel format bgra (RGBA pixels)
 	// rgba/bgra is faster than rgb24/bgr24 due to SSE optimized pixel copy from the sender texture
 	if(bRgba)
 		args += " -pix_fmt rgba";
@@ -149,46 +151,45 @@ bool spoutRecord::Start(std::string ffmpegPath, std::string OutputFile,
 	// Codec options
 	if (m_FFmpegCodec.empty()) {
 
-		// Codec - 0-mpeg4, 1-libx264, 2-h264_nvenc, 3-hevc_nvenc, 4-hap 
-		if (m_codec == 4) { // hap
+		// Codec - 0-mpeg4, 1-libx264, 2-libx265, 3-h264_nvenc, 4-hevc_nvenc, 5-hap 
+		if (m_codec == 5) { // hap
 
 			// Works but VLC crash and restart
 			// -vcodec hap -format (hap, hap_q, hap_alpha)
 			args += " -vcodec hap";
 
+			// TODO
 			// Quality
 			//    0 - low (hap)
 			//    1 - medium (hap_q)
 			//    2 - high (hap_alpha)
-			/*
-			if (m_Quality == 0)
-				args += " -format hap";
-			else if (m_Quality == 1)
-				args += " -format hap_q";
-			else
-				args += " -format hap_alpha";
-			*/
+			//
+			// if (m_Quality == 0)
+				// args += " -format hap";
+			// else if (m_Quality == 1)
+				// args += " -format hap_q";
+			// else
+				// args += " -format hap_alpha";
 
 			m_FileExt = "mov";
 
 		}
-		else if (m_codec == 3) { // HEVC_NVENC hardware encode
+		// 0-mpeg4, 1-libx264, 2-libx265, 3-h264_nvenc, 4-hevc_nvenc, 5-hap 
+		else if (m_codec == 4) { // HEVC_NVENC hardware encode
 
 			// " -vcodec hevc_nvenc -preset llhq -tune ull -pix_fmt yuv444p";
-
 			args += " -vcodec hevc_nvenc";
 
 			// Preset
 			// https://gist.github.com/nico-lab/c2d192cbb793dfd241c1eafeb52a21c3
-			/*
-			p1              12           E..V....... fastest (lowest quality)
-			p2              13           E..V....... faster (lower quality)
-			p3              14           E..V....... fast (low quality)
-			p4              15           E..V....... medium (default)
-			p5              16           E..V....... slow (good quality)
-			p6              17           E..V....... slower (better quality)
-			p7              18           E..V....... slowest (best quality)
-			*/
+			// p1              12           E..V....... fastest (lowest quality)
+			// p2              13           E..V....... faster (lower quality)
+			// p3              14           E..V....... fast (low quality)
+			// p4              15           E..V....... medium (default)
+			// p5              16           E..V....... slow (good quality)
+			// p6              17           E..V....... slower (better quality)
+			// p7              18           E..V....... slowest (best quality)
+			//
 			// Quality
 			//    0 - low (p1)
 			//    1 - medium (p4)
@@ -205,14 +206,19 @@ bool spoutRecord::Start(std::string ffmpegPath, std::string OutputFile,
 			// Tune
 			args += " -tune ull"; // Ultra low latency
 
-			// Output pixel format
-			// Default 4:2:0 - 8 bits
-			args += " -pix_fmt yuv444p"; // 4:4:4 - 8 bits 
+			// Output pixel format - chroma subsampling
+			if(m_Chroma == 0)
+				args += " -pix_fmt yuv420p"; // 4:2:0
+			else if(m_Chroma == 1)
+				args += " -pix_fmt yuv422p"; // 4:2:2
+			else if (m_Chroma == 2) // default
+				args += " -pix_fmt yuv444p"; // 4:4:4
 
 			m_FileExt = "mkv";
 
 		}
-		else if (m_codec == 2) { //- h264_nvenc
+		// 0-mpeg4, 1-libx264, 2-libx265, 3-h264_nvenc, 4-hevc_nvenc, 5-hap 
+		else if (m_codec ==3) { //- h264_nvenc
 
 			// h264-nvenc uses NVidia h264 GPU encoder 
 			args += " -vcodec h264_nvenc";
@@ -263,11 +269,57 @@ bool spoutRecord::Start(std::string ffmpegPath, std::string OutputFile,
 			args += " -profile high444p"; // 4:4:4
 			// args += " -profile baseline"; // 4:2:0
 
-			// Output pixel format
-			// Default 4:2:0 - 8 bits
-			 args += " -pix_fmt yuv444p"; // 4:4:4 - 8 bits 
+			// Output pixel format - chroma subsampling
+			if (m_Chroma == 0)
+				args += " -pix_fmt yuv420p"; // 4:2:0
+			else if (m_Chroma == 1)
+				args += " -pix_fmt yuv422p"; // 4:2:2
+			else if (m_Chroma == 2) // default
+				args += " -pix_fmt yuv444p"; // 4:4:4
+
+			printf("%s\n", args.c_str());
 
 			m_FileExt = "mkv";
+		}
+		// 0-mpeg4, 1-libx264, 2-libx265, 3-h264_nvenc, 4-hevc_nvenc, 5-hap 
+		if (m_codec == 2) { // libx265
+
+			args += " -vcodec libx265";
+
+			// 0 - ultrafast, 1 - superfast, 2 - veryfast, 3 - faster
+			if (m_Preset == 0)
+				args += " -preset ultrafast";
+			else if (m_Preset == 1)
+				args += " -preset superfast";
+			else if (m_Preset == 2)
+				args += " -preset veryfast";
+			else
+				args += " -preset faster";
+
+			// Tune
+			args += " -tune zerolatency";
+
+			// Quality
+			//    0 - low (crf 32)
+			//    1 - medium (crf 28)
+			//    2 - high (crf 20)
+			if (m_Quality == 0)
+				args += " -crf 32";
+			else if (m_Quality == 1)
+				args += " -crf 28";
+			else
+				args += " -crf 20";
+
+			// Output pixel format - chroma subsampling
+			if (m_Chroma == 0)
+				args += " -pix_fmt yuv420p"; // 4:2:0
+			else if (m_Chroma == 1)
+				args += " -pix_fmt yuv422p"; // 4:2:2
+			else if (m_Chroma == 2) // default
+				args += " -pix_fmt yuv444p"; // 4:4:4
+
+			m_FileExt = "mkv";
+
 		}
 		else if(m_codec == 1) { // libx264
 
@@ -299,12 +351,21 @@ bool spoutRecord::Start(std::string ffmpegPath, std::string OutputFile,
 			else
 				args += " -crf 18";
 
+			// Output pixel format - chroma subsampling
+			if (m_Chroma == 0)
+				args += " -pix_fmt yuv420p"; // 4:2:0
+			else if (m_Chroma == 1)
+				args += " -pix_fmt yuv422p"; // 4:2:2
+			else if (m_Chroma == 2) // default
+				args += " -pix_fmt yuv444p"; // 4:4:4
+
 			m_FileExt = "mkv";
 		}
 		else {
 			// Default FFmpeg “mpeg4” encoder (MPEG-4 Part 2 format)
 			// https://trac.ffmpeg.org/wiki/Encode/MPEG-4
 			args += " -vcodec mpeg4 -qscale:v 3"; // high quality
+			// Chroma subsampling is always 4:2:0
 			m_FileExt = "mp4";
 		}
 	}
@@ -330,7 +391,7 @@ bool spoutRecord::Start(std::string ffmpegPath, std::string OutputFile,
 	str += OutputFile; // Output file full path
 	str += "\""; // Final double quote
 
-	printf("%s\n", str.c_str());
+	// printf("%s\n", str.c_str());
 
 
 	// _popen for FFmpeg will open a console window.
@@ -411,7 +472,6 @@ bool spoutRecord::Write(GLuint TextureID, GLuint TextureTarget, unsigned int wid
 		m_nBytes = nBytes;
 	}
 
-	// Extract pixels from the OpenGL texture
 	if (!spout.UnloadTexturePixels(TextureID, TextureTarget, width, height,
 		width*4, m_pixelBuffer, GL_RGBA, false)) {
 		printf("UnloadTexturePixels failed\n");
@@ -527,7 +587,7 @@ void spoutRecord::EnableAudio(bool bAudio)
 
 // -----------------------------------------------
 // Set codec
-//    0 - mpeg4, 1 - x264
+//    0-mpeg4, 1-libx264, 2-libx265, 3-h264_nvenc, 4-hevc_nvenc, 5-hap 
 //
 void spoutRecord::SetCodec(int codec)
 {
@@ -543,7 +603,7 @@ void spoutRecord::SetCodec(std::string codecString)
 }
 
 // -----------------------------------------------
-// Set usre defined container extension for output
+// Set user defined container extension for output
 //
 void spoutRecord::SetExtension(std::string extension)
 {
@@ -572,6 +632,7 @@ void spoutRecord::SetRate(int rate)
 	m_Crf = rate;
 }
 
+
 // -----------------------------------------------
 // Set x264 quality (crf)
 //    0 - low (crf 28)
@@ -589,6 +650,14 @@ void spoutRecord::SetQuality(int quality)
 		m_Crf = 18; // High
 }
 
+// -----------------------------------------------
+// Set chroma subsampling
+// 0 - low 4:2:0, 1 - medium 4:2:2, 2 - high 4:4:4
+//
+void spoutRecord::SetChroma(int chroma)
+{
+	m_Chroma = chroma;
+}
 
 // -----------------------------------------------
 // Set frame rate for FFmpeg output

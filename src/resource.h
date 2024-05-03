@@ -1,7 +1,7 @@
 
 //
 // Enable this define to create a receiver rather than a sender
-// #define BUILDRECEIVER
+#define BUILDRECEIVER
 //
 
 
@@ -61,14 +61,18 @@
 #define IDC_AUDIO           40005
 #define IDC_MPEG4           40006
 #define IDC_X264            40007
-#define IDC_QLOW            40008
-#define IDC_QMED            40009
-#define IDC_QHIGH           40010
-#define IDC_PRESET          40011
-#define IDC_RESEND          40012
-#define IDC_RESEND_NAME     40013
-#define IDC_OPTIONS_RESET   40014
-#define IDC_OPTIONS_HELP    40015
+#define IDC_X265            40008
+#define IDC_QLOW            40009
+#define IDC_QMED            40010
+#define IDC_QHIGH           40011
+#define IDC_CLOW            40012
+#define IDC_CMED            40013
+#define IDC_CHIGH           40014
+#define IDC_PRESET          40015
+#define IDC_RESEND          40016
+#define IDC_RESEND_NAME     40017
+#define IDC_OPTIONS_RESET   40018
+#define IDC_OPTIONS_HELP    40019
 
 
 

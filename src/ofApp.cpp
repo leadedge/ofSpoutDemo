@@ -125,6 +125,8 @@
 	30.04.24 - Add bloom shader
 			   Revise shader adjust dialog and open on left side of window.
 			   Add GL_RGB10_A2 format for sender
+	03.05.24 - Receiver - SpoutRecord.cpp 
+			   Add h265 encoding and chroma subsampling options for recording
 			   Version 1.021
 
     =========================================================================
@@ -166,6 +168,7 @@ static long SecondsDuration = 0L; // time to record
 static bool bAudio = false; // system audio
 static int codec = 0; // mpg4 / h264
 static int quality = 0; // h264 CRF
+static int chroma = 2; // 4:2:0, 4:2:2, 4:4:4
 static int preset = 0; // h264 preset
 static int presetindex = 0; // for the combobox
 static int imagetype = 0; // Image type index
@@ -180,6 +183,7 @@ long old_SecondsDuration = SecondsDuration;
 bool old_bAudio = bAudio;
 int old_codec = codec;
 int old_quality = quality;
+int old_chroma = chroma;
 int old_preset = preset;
 int old_imagetype = imagetype;
 bool old_bResend = bResend;
@@ -1166,6 +1170,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 		old_bAudio = bAudio;
 		old_codec = codec;
 		old_quality = quality;
+		old_chroma = chroma;
 		old_preset = preset;
 		old_imagetype = imagetype;
 		old_bResend = bResend;
@@ -1179,6 +1184,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 			bAudio = old_bAudio;
 			codec = old_codec;
 			quality = old_quality;
+			chroma = old_chroma;
 			preset = old_preset;
 			imagetype = old_imagetype;
 			imagetype = old_imagetype;
@@ -1531,10 +1537,13 @@ bool ofApp::StartRecording(bool prompt)
 			g_OutputFile += ".mkv";
 	}
 
-	// Options for audio, codec and fps
+	// Options for audio, codec, preset, quality (crf), chroma and fps
 	recorder.EnableAudio(bAudio); // For recording system audio
-	recorder.SetCodec(codec); // 0-mpeg4, 1-x264 codec
-	recorder.SetFps(30); // Fps for FFmpeg (see HoldFps)
+	recorder.SetCodec(codec);     // 0-mpeg4, 1-libx264, 2-libx265
+	recorder.SetPreset(preset);   // 0-ultrafast, 1-superfast, 2-veryfast, 3-faster
+	recorder.SetQuality(quality); // 0-low, 1-medium, 2-high (crf)
+	recorder.SetChroma(chroma);   // 0 - low 4:2:0, 1 - medium 4:2:2, 2 - high 4:4:4
+	recorder.SetFps(30);          // Fps for FFmpeg (see HoldFps)
 
 	if (recorder.Start(g_FFmpegPath, g_OutputFile, receiver.GetSenderWidth(), receiver.GetSenderHeight(), true)) { // RGBA pixel format
 		bRecording = true;
@@ -1579,13 +1588,22 @@ void ofApp::StopRecording()
 			msgstr += "mpeg4 codec, ";
 		}
 		else {
-			msgstr += "x264 codec, ";
+			if (codec == 1)
+				msgstr += "x264 codec, ";
+			if (codec == 2)
+				msgstr += "x265 codec, ";
 			if (quality == 0)
 				msgstr += "low quality, ";
 			if (quality == 1)
 				msgstr += "medium quality, ";
 			if (quality == 2)
 				msgstr += "high quality, ";
+			if (chroma == 0)
+				msgstr += "4:2:0, ";
+			if (chroma == 1)
+				msgstr += "4:2:2, ";
+			if (chroma == 2)
+				msgstr += "4:4:4, ";
 			if (preset == 0)
 				msgstr += "ultrafast, ";
 			if (preset == 1)
@@ -1843,6 +1861,12 @@ void ofApp::WriteInitFile(const char* initfile)
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"1", (LPCSTR)initfile);
 	else
 		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"2", (LPCSTR)initfile);
+	if (chroma == 0)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Chroma", (LPCSTR)"0", (LPCSTR)initfile);
+	else if (chroma == 1)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Chroma", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Chroma", (LPCSTR)"2", (LPCSTR)initfile);
 
 	sprintf_s(tmp, MAX_PATH, "%d", preset);
 	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Preset", (LPCSTR)tmp, (LPCSTR)initfile);
@@ -1925,7 +1949,7 @@ void ofApp::ReadInitFile(const char* initfile)
 	
 	// Recording options
 	bPrompt = false; bShowFile = false; bDuration=false; SecondsDuration=0L;
-	bAudio = false; codec = 0; quality = 1; preset = 0;
+	bAudio = false; codec = 0; quality = 1; chroma = 2; preset = 0;
 	
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Prompt", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) bPrompt = (atoi(tmp) == 1);
@@ -1941,6 +1965,8 @@ void ofApp::ReadInitFile(const char* initfile)
 	if (tmp[0]) codec = atoi(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Quality", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) quality = atoi(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Chroma", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) chroma = atoi(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Preset", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) preset = atoi(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Imagetype", NULL, (LPSTR)tmp, 3, initfile);
@@ -2171,8 +2197,9 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			CheckDlgButton(hDlg, IDC_SHOWFILE, (UINT)bShowFile);
 			// Record for duration
 			CheckDlgButton(hDlg, IDC_DURATION, (UINT)bDuration);
-			// Codec - 0-mpeg4, 1-x264
-			CheckRadioButton(hDlg, IDC_MPEG4, IDC_X264, IDC_MPEG4+codec);
+			// Codec : 0-mpeg4, 1-libx264, 2-libx265
+			// TODO  : 0-mpeg4, 1-libx264, 2-libx265, 3-h264_nvenc, 4-hevc_nvenc, 5-hap 
+			CheckRadioButton(hDlg, IDC_MPEG4, IDC_X265, IDC_MPEG4+codec);
 			// System audio
 			CheckDlgButton(hDlg, IDC_AUDIO, (UINT)bAudio);
 			// SecondsDuration
@@ -2180,7 +2207,8 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			SetDlgItemTextA(hDlg, IDC_SECONDS, (LPCSTR)tmp);
 			// Quality
 			CheckRadioButton(hDlg, IDC_QLOW, IDC_QHIGH, IDC_QLOW+(int)quality);
-
+			// Chroma
+			CheckRadioButton(hDlg, IDC_CLOW, IDC_CHIGH, IDC_CLOW+(int)chroma);
 			// Presets
 			hwndList = GetDlgItem(hDlg, IDC_PRESET);
 			SendMessageA(hwndList, (UINT)CB_RESETCONTENT, 0, 0L);
@@ -2192,9 +2220,13 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			// Disable h264 options for mpeg4
 			if (codec == 0) {
 				// Quality
-				EnableWindow(GetDlgItem(hDlg, IDC_QLOW), FALSE);
-				EnableWindow(GetDlgItem(hDlg, IDC_QMED), FALSE);
+				EnableWindow(GetDlgItem(hDlg, IDC_QLOW),  FALSE);
+				EnableWindow(GetDlgItem(hDlg, IDC_QMED),  FALSE);
 				EnableWindow(GetDlgItem(hDlg, IDC_QHIGH), FALSE);
+				// Chroma
+				EnableWindow(GetDlgItem(hDlg, IDC_CLOW),  FALSE);
+				EnableWindow(GetDlgItem(hDlg, IDC_CMED),  FALSE);
+				EnableWindow(GetDlgItem(hDlg, IDC_CHIGH), FALSE);
 				// Preset
 				EnableWindow(GetDlgItem(hDlg, IDC_PRESET), FALSE);
 			}
@@ -2227,16 +2259,23 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		switch (LOWORD(wParam)) {
 
 		case IDC_MPEG4:
-			EnableWindow(GetDlgItem(hDlg, IDC_QLOW), FALSE);
-			EnableWindow(GetDlgItem(hDlg, IDC_QMED), FALSE);
-			EnableWindow(GetDlgItem(hDlg, IDC_QHIGH), FALSE);
+			EnableWindow(GetDlgItem(hDlg, IDC_QLOW),   FALSE);
+			EnableWindow(GetDlgItem(hDlg, IDC_QMED),   FALSE);
+			EnableWindow(GetDlgItem(hDlg, IDC_QHIGH),  FALSE);
+			EnableWindow(GetDlgItem(hDlg, IDC_CLOW),   FALSE);
+			EnableWindow(GetDlgItem(hDlg, IDC_CMED),   FALSE);
+			EnableWindow(GetDlgItem(hDlg, IDC_CHIGH),  FALSE);
 			EnableWindow(GetDlgItem(hDlg, IDC_PRESET), FALSE);
 			break;
 
 		case IDC_X264:
-			EnableWindow(GetDlgItem(hDlg, IDC_QLOW), TRUE);
-			EnableWindow(GetDlgItem(hDlg, IDC_QMED), TRUE);
-			EnableWindow(GetDlgItem(hDlg, IDC_QHIGH), TRUE);
+		case IDC_X265:
+			EnableWindow(GetDlgItem(hDlg, IDC_QLOW),   TRUE);
+			EnableWindow(GetDlgItem(hDlg, IDC_QMED),   TRUE);
+			EnableWindow(GetDlgItem(hDlg, IDC_QHIGH),  TRUE);
+			EnableWindow(GetDlgItem(hDlg, IDC_CLOW),   TRUE);
+			EnableWindow(GetDlgItem(hDlg, IDC_CMED),   TRUE);
+			EnableWindow(GetDlgItem(hDlg, IDC_CHIGH),  TRUE);
 			EnableWindow(GetDlgItem(hDlg, IDC_PRESET), TRUE);
 			break;
 
@@ -2280,6 +2319,11 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				str += "Low quality will create a smaller file at the expense of quality. ";
 				str += "Medium is the default, a balance between file size and quality.\n\n";
 
+				str += "<a href=\"https://trac.ffmpeg.org/wiki/Chroma%20Subsampling\">Chroma subsampling</a>\n";
+				str += "high : 4:4:4, no chroma subsampling. Highest quality and default for h264 and h265.\n";
+				str += "med : 4:2:2, chroma sampled horizontally at half rate.\n";
+				str += "low  : 4:2:0, chroma sampled horizontally and verticall at half rate. Most commonly used.\n\n";
+
 				str += "Preset\n";
 				str += "h264 preset : ultrafast, superfast, veryfast, faster. ";
 				str += "Presets affect encoding speed and compression ratio. ";
@@ -2307,6 +2351,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			bAudio = false;
 			codec = 0;
 			quality = 1;
+			chroma = 2;
 			preset = 0;
 			imagetype = 0;
 			bResend = false;
@@ -2324,6 +2369,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			bResend = false;
 			codec = 0;
 			quality = 1;
+			chroma = 2;
 			preset = 0;
 			imagetype = 0;
 			if (IsDlgButtonChecked(hDlg, IDC_PROMPT) == BST_CHECKED)
@@ -2336,12 +2382,18 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			SecondsDuration = atol(tmp);
 			if (IsDlgButtonChecked(hDlg, IDC_AUDIO) == BST_CHECKED)
 				bAudio = true;
+			if (IsDlgButtonChecked(hDlg, IDC_X265) == BST_CHECKED)
+				codec = 2;
 			if (IsDlgButtonChecked(hDlg, IDC_X264) == BST_CHECKED)
 				codec = 1;
 			if (IsDlgButtonChecked(hDlg, IDC_QLOW) == BST_CHECKED)
 				quality = 0;
 			if (IsDlgButtonChecked(hDlg, IDC_QHIGH) == BST_CHECKED)
 				quality = 2;
+			if (IsDlgButtonChecked(hDlg, IDC_CLOW) == BST_CHECKED)
+				chroma = 0;
+			if (IsDlgButtonChecked(hDlg, IDC_CMED) == BST_CHECKED)
+				chroma = 1;
 			preset = presetindex;
 			imagetype = imagetypeindex;
 			extension = imagetypes[imagetype];
