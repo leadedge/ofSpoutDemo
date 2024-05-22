@@ -48,10 +48,13 @@ Show file information after video recording or image capture.
 Record for a fixed amount of time. Enter the number of seconds to record.
 * Audio - record with system audio\
 Audio from the system audio device (speakers) is recorded along with the video using a [virtual audio device](https://github.com/rdp/virtual-audio-capture-grabber-device) developed by Roger Pack. The audio filters must be registered. Refer to the "bin\data\audio" folder for details.
-* Codec - mpeg4 or h264\
-h264 codec can be used instead of default Mpeg4.
-* Quality - h264 quality\
-h264 constant rate factor CRF (0 > 51) : low = 28, medium = 23, high = 18.
+* Codec - mpeg4, h264 or h265\
+h264 and h265 codecs can be used instead of default Mpeg4.
+* Quality - h264/h265 quality constant rate factor (CRF)\
+h264 : low = 28, medium = 23, high = 18\
+h264 : low = 32, medium = 28, high = 20
+* Chroma sub-sampling\
+0 - low 4:2:0, 1 - medium 4:2:2, 2 - high 4:4:4
 * Preset - h264 preset\
 ultrafast, superfast, veryfast, faster
 * Re-send\
