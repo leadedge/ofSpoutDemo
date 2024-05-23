@@ -127,7 +127,11 @@
 			   Add GL_RGB10_A2 format for sender
 	03.05.24 - Receiver - SpoutRecord.cpp 
 			   Add h265 encoding and chroma subsampling options for recording
+			   Add h265 to Options > Help
+	04.05.24 - Chroma details in Options dialog and help text
 			   Version 1.021
+	23.05.24 - Sender : SelectSenderFormat - correct default format
+			   Version 1.022
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -166,7 +170,7 @@ static bool bShowFile = false; // show file name details after save
 static bool bDuration = false; // record for fixed duration
 static long SecondsDuration = 0L; // time to record
 static bool bAudio = false; // system audio
-static int codec = 0; // mpg4 / h264
+static int codec = 1; // mpg4 / h264 / h265
 static int quality = 0; // h264 CRF
 static int chroma = 2; // 4:2:0, 4:2:2, 4:4:4
 static int preset = 0; // h264 preset
@@ -1949,7 +1953,7 @@ void ofApp::ReadInitFile(const char* initfile)
 	
 	// Recording options
 	bPrompt = false; bShowFile = false; bDuration=false; SecondsDuration=0L;
-	bAudio = false; codec = 0; quality = 1; chroma = 2; preset = 0;
+	bAudio = false; codec = 1; quality = 1; chroma = 2; preset = 0;
 	
 	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Prompt", NULL, (LPSTR)tmp, 3, initfile);
 	if (tmp[0]) bPrompt = (atoi(tmp) == 1);
@@ -2120,7 +2124,7 @@ bool ofApp::SelectSenderFormat()
 	items.push_back("32 bit RGBA float");
 	int selected = 0;
 	switch (glFormat) {
-		case GL_RGBA:     selected = 1;	break;
+		case GL_RGBA8:    selected = 1;	break;
 		case GL_RGB10_A2: selected = 2; break;
 		case GL_RGBA16:	  selected = 3; break;
 		case GL_RGBA16F:  selected = 4; break;
@@ -2132,20 +2136,24 @@ bool ofApp::SelectSenderFormat()
 
 	if (SpoutMessageBox(NULL, NULL, "Sender format", MB_ICONINFORMATION | MB_OKCANCEL, items, selected) == IDOK) {
 		switch (selected) {
-			// Default DirectX output format
-			case 1:	glFormat = GL_RGBA;     break;
-			case 2:	glFormat = GL_RGB10_A2; break;
-			case 3:	glFormat = GL_RGBA16;   break;
-			case 4:	glFormat = GL_RGBA16F;  break;
-			case 5:	glFormat = GL_RGBA32F;  break;
-			case 0: default: glFormat = GL_RGBA; break; // Changed below
+			// Default DirectX output format (GL_RGBA)
+			default:
+			case 0: glFormat = GL_RGBA;		break; // 0x1908 - changed below
+			case 1:	glFormat = GL_RGBA8;    break; // 0x8058
+			case 2:	glFormat = GL_RGB10_A2; break; // 0x8059
+			case 3:	glFormat = GL_RGBA16;   break; // 0x805B
+			case 4:	glFormat = GL_RGBA16F;  break; // 0x881A
+			case 5:	glFormat = GL_RGBA32F;  break; // 0x8814
 		}
 		// Set sender DirectX texture format
 		sender.ReleaseSender();
-		if (selected == 0)
+		if (selected == 0) {
 			sender.SetSenderFormat(DXGI_FORMAT_B8G8R8A8_UNORM); // Default
-		else
+		}
+		else {
 			sender.SetSenderFormat(sender.DX11format(glFormat)); // Selected
+		}
+
 		sender.SetSenderName(senderName); // Keep the same name
 		myFbo.allocate(senderWidth, senderHeight, glFormat);
 		return true;
@@ -2167,6 +2175,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	char tmp[256]={0};
 	char presets[4][128] ={ "Ultrafast", "Superfast", "Veryfast", "Faster" };
 	// imagetypes array is static
+	int state = 1; // TRUE/FALSE
 
 
 	switch (message) {
@@ -2218,18 +2227,18 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			SendMessageA(hwndList, CB_SETCURSEL, (WPARAM)presetindex, (LPARAM)0);
 
 			// Disable h264 options for mpeg4
-			if (codec == 0) {
-				// Quality
-				EnableWindow(GetDlgItem(hDlg, IDC_QLOW),  FALSE);
-				EnableWindow(GetDlgItem(hDlg, IDC_QMED),  FALSE);
-				EnableWindow(GetDlgItem(hDlg, IDC_QHIGH), FALSE);
-				// Chroma
-				EnableWindow(GetDlgItem(hDlg, IDC_CLOW),  FALSE);
-				EnableWindow(GetDlgItem(hDlg, IDC_CMED),  FALSE);
-				EnableWindow(GetDlgItem(hDlg, IDC_CHIGH), FALSE);
-				// Preset
-				EnableWindow(GetDlgItem(hDlg, IDC_PRESET), FALSE);
-			}
+			if (codec == 0)	state = FALSE;
+			else state = TRUE;
+			// Quality
+			EnableWindow(GetDlgItem(hDlg, IDC_QLOW),  state);
+			EnableWindow(GetDlgItem(hDlg, IDC_QMED),  state);
+			EnableWindow(GetDlgItem(hDlg, IDC_QHIGH), state);
+			// Chroma
+			EnableWindow(GetDlgItem(hDlg, IDC_CLOW), state);
+			EnableWindow(GetDlgItem(hDlg, IDC_CMED), state);
+			EnableWindow(GetDlgItem(hDlg, IDC_CHIGH), state);
+			// Preset
+			EnableWindow(GetDlgItem(hDlg, IDC_PRESET), state);
 
 			// Re-send option
 			if (bResend)
@@ -2309,23 +2318,25 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 				str += "Codec\n";
 				str += "<a href=\"https://trac.ffmpeg.org/wiki/Encode/MPEG-4\">Mpeg4</a> is a well established codec ";
-				str += "that provides good video quality at high speed. ";
+				str += "that provides good video quality at high speed.\n";
 				str += "<a href=\"https://trac.ffmpeg.org/wiki/Encode/H.264\">h264</a> is a modern codec with more control over ";
-				str += "quality, encoding speed and file size.\n\n";
+				str += "quality, encoding speed and file size.\n";
+				str += "<a href=\"https://trac.ffmpeg.org/wiki/Encode/H.265\">h265</a> (High Efficiency Video Encoding) is similar to h264 but ";
+				str += "produces smaller files, while retaining the same visual quality. Encoding time is greater but maintains 30fps at 1920x1080. Test with your system.\n\n";
 
 				str += "Quality\n";
-				str += "h264 constant rate factor CRF (0 > 51) : low = 28, medium = 23, high = 18. ";
+				str += "h264 constant rate factor CRF (0 > 51) : Low = 28, Medium = 23, High = 18. ";
 				str += "High quality is effectively lossless, but will create a larger file. ";
 				str += "Low quality will create a smaller file at the expense of quality. ";
 				str += "Medium is the default, a balance between file size and quality.\n\n";
 
 				str += "<a href=\"https://trac.ffmpeg.org/wiki/Chroma%20Subsampling\">Chroma subsampling</a>\n";
-				str += "high : 4:4:4, no chroma subsampling. Highest quality and default for h264 and h265.\n";
-				str += "med : 4:2:2, chroma sampled horizontally at half rate.\n";
-				str += "low  : 4:2:0, chroma sampled horizontally and verticall at half rate. Most commonly used.\n\n";
+				str += "Low   : 4:2:0, chroma sampled horizontally and vertically at half rate. Most commonly used.\n";
+				str += "Med  : 4:2:2, chroma sampled horizontally at half rate.\n";
+				str += "High : 4:4:4, no chroma subsampling. Highest quality and default for h264 and h265.\n\n";
 
 				str += "Preset\n";
-				str += "h264 preset : ultrafast, superfast, veryfast, faster. ";
+				str += "h264 preset : Ultrafast, Superfast, Veryfast, Faster. ";
 				str += "Presets affect encoding speed and compression ratio. ";
 				str += "These are the presets necessary for real-time encoding. ";
 				str += "Higher speed presets encode faster but produce progressively larger files. ";
@@ -2349,7 +2360,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			bDuration = false;
 			SecondsDuration = 0L;
 			bAudio = false;
-			codec = 0;
+			codec = 1;
 			quality = 1;
 			chroma = 2;
 			preset = 0;
@@ -2367,7 +2378,7 @@ INT_PTR CALLBACK Options(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			SecondsDuration = 0L;
 			bAudio = false;
 			bResend = false;
-			codec = 0;
+			codec = 1;
 			quality = 1;
 			chroma = 2;
 			preset = 0;

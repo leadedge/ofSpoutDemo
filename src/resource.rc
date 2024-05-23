@@ -33,50 +33,50 @@ IDI_ICON1 ICON "DATA/images/Spout.ico"
 // Dialog resources
 //
 
-IDD_OPTIONSBOX DIALOGEX 0, 0, 148, 192
+IDD_OPTIONSBOX DIALOGEX 0, 0, 163, 192
 STYLE DS_3DLOOK | DS_SHELLFONT | WS_CAPTION | WS_VISIBLE | WS_POPUP
 CAPTION "Options"
 FONT 9, "Ms Shell Dlg", 0, 0, 1
 {
-    GROUPBOX        "Capture", -1,    11,  5, 125, 30, 0, WS_EX_LEFT
-    LTEXT           "Image type", -1, 18, 17, 42, 9, SS_LEFT, WS_EX_LEFT
-    COMBOBOX        IDC_IMAGE_TYPE,   63, 16, 60, 40, CBS_DROPDOWN | CBS_HASSTRINGS, WS_EX_LEFT
+    GROUPBOX        "Capture", -1,            11,  5, 140, 30, 0, WS_EX_LEFT
+    LTEXT           "Image type", -1,         18, 17,  42, 9, SS_LEFT, WS_EX_LEFT
+    COMBOBOX        IDC_IMAGE_TYPE,           63, 16,  60, 40, CBS_DROPDOWN | CBS_HASSTRINGS, WS_EX_LEFT
 
-    GROUPBOX        "Recording", -1,          11, 38, 125, 102, 0, WS_EX_LEFT
-    AUTOCHECKBOX    "File save", IDC_PROMPT,  18, 51, 40, 8, BS_LEFTTEXT, WS_EX_LEFT
-    AUTOCHECKBOX    "Details", IDC_SHOWFILE,  63, 51, 40, 8, WS_EX_LEFT
-    AUTOCHECKBOX    "Audio", IDC_AUDIO,       18, 76, 40, 8, BS_LEFTTEXT, WS_EX_LEFT
-    LTEXT           "System audio", -1,       63, 76, 42, 9, SS_LEFT, WS_EX_LEFT
-    AUTOCHECKBOX    "Duration", IDC_DURATION, 18, 63, 40, 8, BS_LEFTTEXT, WS_EX_LEFT
-    EDITTEXT        IDC_SECONDS,              63, 63, 30, 12, ES_AUTOHSCROLL, WS_EX_LEFT
-    LTEXT           "seconds", -1,            99, 63, 27, 9, SS_LEFT, WS_EX_LEFT
-    LTEXT           "Codec", -1,              18, 88, 21, 9, SS_LEFT, WS_EX_LEFT
+    GROUPBOX        "Recording", -1,          11, 38, 140, 102, 0, WS_EX_LEFT
+    AUTOCHECKBOX    "File save", IDC_PROMPT,  18, 51,  40, 8, BS_LEFTTEXT, WS_EX_LEFT
+    AUTOCHECKBOX    "Details", IDC_SHOWFILE,  63, 51,  40, 8, WS_EX_LEFT
+    AUTOCHECKBOX    "Audio", IDC_AUDIO,       18, 76,  40, 8, BS_LEFTTEXT, WS_EX_LEFT
+    LTEXT           "System audio", -1,       63, 76,  42, 9, SS_LEFT, WS_EX_LEFT
+    AUTOCHECKBOX    "Duration", IDC_DURATION, 18, 63,  40, 8, BS_LEFTTEXT, WS_EX_LEFT
+    EDITTEXT        IDC_SECONDS,              63, 62,  30, 10, ES_AUTOHSCROLL, WS_EX_LEFT
+    LTEXT           "seconds", -1,            96, 63,  27, 9, SS_LEFT, WS_EX_LEFT
+    LTEXT           "Codec", -1,              18, 88,  21, 9, SS_LEFT, WS_EX_LEFT
     
     AUTORADIOBUTTON "Mpeg4", IDC_MPEG4, 50,  88, 32, 8, 0, WS_EX_LEFT
     AUTORADIOBUTTON "h264",  IDC_X264,  85,  88, 30, 8, 0, WS_EX_LEFT
-    AUTORADIOBUTTON "h265",  IDC_X265, 115,  88, 30, 8, 0, WS_EX_LEFT
+    AUTORADIOBUTTON "h265",  IDC_X265, 118,  88, 30, 8, 0, WS_EX_LEFT
 
     LTEXT           "Quality", -1,      18, 100, 22, 9, SS_LEFT, WS_EX_LEFT
     AUTORADIOBUTTON "Low",  IDC_QLOW,   50, 100, 24, 8, 0, WS_EX_LEFT
-    AUTORADIOBUTTON "Med",  IDC_QMED,   76, 100, 24, 8, 0, WS_EX_LEFT
-    AUTORADIOBUTTON "High", IDC_QHIGH, 103, 100, 30, 8, 0, WS_EX_LEFT
+    AUTORADIOBUTTON "Med",  IDC_QMED,   85, 100, 24, 8, 0, WS_EX_LEFT
+    AUTORADIOBUTTON "High", IDC_QHIGH, 118, 100, 30, 8, 0, WS_EX_LEFT
 
-    LTEXT           "Chroma", -1,       18, 112, 30, 9, SS_LEFT, WS_EX_LEFT
-    AUTORADIOBUTTON "Low",  IDC_CLOW,   50, 112, 24, 8, 0, WS_EX_LEFT
-    AUTORADIOBUTTON "Med",  IDC_CMED,   76, 112, 24, 8, 0, WS_EX_LEFT
-    AUTORADIOBUTTON "High", IDC_CHIGH, 103, 112, 30, 8, 0, WS_EX_LEFT
+    LTEXT           "Chroma", -1,        18, 112, 30, 9, SS_LEFT, WS_EX_LEFT
+    AUTORADIOBUTTON "4:2:0", IDC_CLOW,   50, 112, 30, 8, 0, WS_EX_LEFT
+    AUTORADIOBUTTON "4:2:2", IDC_CMED,   85, 112, 30, 8, 0, WS_EX_LEFT
+    AUTORADIOBUTTON "4:4:4", IDC_CHIGH, 118, 112, 30, 8, 0, WS_EX_LEFT
 
-    LTEXT           "Preset", -1,       18, 125, 21, 9, SS_LEFT, WS_EX_LEFT
-    COMBOBOX        IDC_PRESET,         50, 123, 78, 30, CBS_DROPDOWN | CBS_HASSTRINGS, WS_EX_LEFT
+    LTEXT           "Preset", -1,                18, 125, 21,  9, SS_LEFT, WS_EX_LEFT
+    COMBOBOX        IDC_PRESET,                  50, 124, 78, 30, CBS_DROPDOWN | CBS_HASSTRINGS, WS_EX_LEFT
 
-    GROUPBOX        "Sending", -1,               11, 142, 125, 25, 0, WS_EX_LEFT
+    GROUPBOX        "Sending", -1,               11, 142, 140, 25, 0, WS_EX_LEFT
     AUTOCHECKBOX    "Re-send", IDC_RESEND,       18, 152,  38,  8, BS_LEFTTEXT, WS_EX_LEFT
     EDITTEXT        IDC_RESEND_NAME,             60, 151,  70, 10, ES_AUTOHSCROLL, WS_EX_LEFT
 
-    DEFPUSHBUTTON   "OK",     IDOK,               12, 172,  30, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Cancel", IDCANCEL,           43, 172,  30, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Reset",  IDC_OPTIONS_RESET,  74, 172,  30, 14, 0, WS_EX_LEFT
-    PUSHBUTTON      "Help",   IDC_OPTIONS_HELP,  105, 172,  30, 14, 0, WS_EX_LEFT
+    DEFPUSHBUTTON   "OK",     IDOK,               20, 172,  30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Cancel", IDCANCEL,           51, 172,  30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Reset",  IDC_OPTIONS_RESET,  82, 172,  30, 14, 0, WS_EX_LEFT
+    PUSHBUTTON      "Help",   IDC_OPTIONS_HELP,  113, 172,  30, 14, 0, WS_EX_LEFT
 
 }
 
@@ -135,8 +135,8 @@ FONT 9, "Microsoft Sans Serif"
 // Version Information resources
 //
 VS_VERSION_INFO VERSIONINFO
-    FILEVERSION     1,0,2,1
-    PRODUCTVERSION  1,0,2,1
+    FILEVERSION     1,0,2,2
+    PRODUCTVERSION  1,0,2,2
     FILEOS          VOS_NT
     FILETYPE        VFT_APP
     FILESUBTYPE     VFT2_UNKNOWN
@@ -148,8 +148,8 @@ VS_VERSION_INFO VERSIONINFO
         BLOCK "080904E4"
         {
             VALUE "CompanyName", "Leading Edge Pty. Ltd.\0"
-            VALUE "FileVersion", "1.021\0"
-            VALUE "ProductVersion", "1.021\0"
+            VALUE "FileVersion", "1.022\0"
+            VALUE "ProductVersion", "1.022\0"
             VALUE "LegalCopyright", "Copyright \251 2022-2024 Lynn Jarvis\0"
 #ifdef BUILDRECEIVER
             VALUE "FileDescription", "Spout Receiver\0"
