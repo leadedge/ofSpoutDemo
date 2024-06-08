@@ -131,6 +131,8 @@
 	04.05.24 - Chroma details in Options dialog and help text
 			   Version 1.021
 	23.05.24 - Sender : SelectSenderFormat - correct default format
+	08.06.24 - Right mouse click select sender, use SpoutPanel if available
+			   or create a sender list and open a MessageBox for selection
 			   Version 1.022
 
     =========================================================================
@@ -861,12 +863,26 @@ void ofApp::mousePressed(int x, int y, int button) {
 	UNREFERENCED_PARAMETER(y);
 
 #ifdef BUILDRECEIVER
-	if (button == 2) { // rh button
-		// No select while recording from this window
+	if (button == 2) { // right mouse button
+		// Do not select while recording from this window
 		if (!bRecording) {
-			// Open the sender selection panel
-			// SpoutSettings must have been run at least once
-			receiver.SelectSender();
+			// Use SpoutPanel if available
+			if (!receiver.SelectSender()) {
+				// If not, create a local sender list
+				std::vector<std::string> senderlist = receiver.GetSenderList();
+				// Open a messagebox for sender selection centred on the 
+				// application window by ofGetWin32Window().
+				// No senders can be selected if the list is empty.
+				// this makes it clear to the user that no senders are running.
+				int selected = 0;
+				SpoutMessageBox(ofGetWin32Window(), NULL, "Select sender", MB_OK, senderlist, selected);
+				// Release the receiver and set the selected sender
+				// as active for the next receive
+				if (!senderlist.empty()) {
+					receiver.ReleaseReceiver();
+					receiver.SetActiveSender(senderlist[selected].c_str());
+				}
+			}
 		}
 		else {
 			SpoutMessageBox(g_hWnd, "No sender selection while recording", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2000);
