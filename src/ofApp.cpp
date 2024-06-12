@@ -131,8 +131,8 @@
 	04.05.24 - Chroma details in Options dialog and help text
 			   Version 1.021
 	23.05.24 - Sender : SelectSenderFormat - correct default format
-	08.06.24 - Right mouse click select sender, use SpoutPanel if available
-			   or create a sender list and open a MessageBox for selection
+	12.06.24 - Spout.cpp - use SpoutPanel if available or create a sender list
+			   and open a MessageBox for selection
 			   Version 1.022
 
     =========================================================================
@@ -695,8 +695,8 @@ void ofApp::draw() {
 			}
 
 			// Show keyboard shortcuts
-			str = "RH click - select sender : f - fullscreen : p - preview : Space - hide info";
-			DrawString(str, 40, ofGetHeight() - 14);
+			str = "Right click - select sender : f - fullscreen : p - preview : Space - hide info";
+			DrawString(str, ofGetWidth()/2 - 294, ofGetHeight() - 14);
 
 			// Show recording status
 			if (bRecording) {
@@ -866,23 +866,16 @@ void ofApp::mousePressed(int x, int y, int button) {
 	if (button == 2) { // right mouse button
 		// Do not select while recording from this window
 		if (!bRecording) {
-			// Use SpoutPanel if available
-			if (!receiver.SelectSender()) {
-				// If not, create a local sender list
-				std::vector<std::string> senderlist = receiver.GetSenderList();
-				// Open a messagebox for sender selection centred on the 
-				// application window by ofGetWin32Window().
-				// No senders can be selected if the list is empty.
-				// this makes it clear to the user that no senders are running.
-				int selected = 0;
-				SpoutMessageBox(ofGetWin32Window(), NULL, "Select sender", MB_OK, senderlist, selected);
-				// Release the receiver and set the selected sender
-				// as active for the next receive
-				if (!senderlist.empty()) {
-					receiver.ReleaseReceiver();
-					receiver.SetActiveSender(senderlist[selected].c_str());
-				}
-			}
+			//
+			// Activate the sender selection dialog
+			//
+			// "SpoutPanel" is used if SpoutSettings has
+			// been run to establish the path.
+			//
+			// If SpoutPanel is not available, a SpoutMessageBox is used.
+			// Centre it on the application window by providing the window handle.
+			//
+			receiver.SelectSender(ofGetWin32Window());
 		}
 		else {
 			SpoutMessageBox(g_hWnd, "No sender selection while recording", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 2000);
