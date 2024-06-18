@@ -134,6 +134,9 @@
 	12.06.24 - Spout.cpp - use SpoutPanel if available or create a sender list
 			   and open a MessageBox for selection
 			   Version 1.022
+	18.06.24 - Use Spout_static.lib instead of SpoutGL source files
+			   Version 1.023
+
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -158,7 +161,6 @@
 // STB for hdr image format
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-
 
 // Capture and recording options
 #ifdef BUILDRECEIVER

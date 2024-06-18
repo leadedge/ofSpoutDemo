@@ -35,9 +35,10 @@
 
 #include <windows.h>
 #include <algorithm> // for std::replace
-#include "..\apps\SpoutGL\SpoutGLextensions.h"
-#include "..\apps\SpoutGL\SpoutCommon.h"
-#include "..\apps\SpoutGL\SpoutUtils.h"
+// Change path as necessary
+#include "..\include\SpoutGLextensions.h"
+#include "..\include\SpoutCommon.h"
+#include "..\include\SpoutUtils.h"
 
 using namespace spoututils;
 

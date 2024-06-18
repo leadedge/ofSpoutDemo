@@ -15,7 +15,7 @@
 
 // Change path as necessary
 #ifdef SPOUTGL
-#include "..\..\..\SpoutGL\Spout.h"
+#include "..\include\Spout.h"
 #else
 #include "SpoutDX\SpoutDX.h"
 #endif

@@ -14,39 +14,6 @@
     </ClCompile>
     <ClCompile Include="src\SpoutRecord.cpp" />
     <ClCompile Include="src\SpoutShaders.cpp" />
-    <ClCompile Include="..\..\SpoutGL\Spout.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\SpoutGL\SpoutCopy.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\SpoutGL\SpoutDirectX.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\SpoutGL\SpoutFrameCount.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\SpoutGL\SpoutGL.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\SpoutGL\SpoutGLextensions.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\SpoutGL\SpoutReceiver.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\SpoutGL\SpoutSender.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\SpoutGL\SpoutSenderNames.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\SpoutGL\SpoutSharedMemory.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\SpoutGL\SpoutUtils.cpp">
-      <Filter>SpoutGL</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ofApp.h" />
@@ -63,42 +30,6 @@
     <ClInclude Include="src\stb_image_write.h" />
     <ClInclude Include="src\SpoutRecord.h" />
     <ClInclude Include="src\SpoutShaders.h" />
-    <ClInclude Include="..\..\SpoutGL\Spout.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutCommon.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutCopy.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutDirectX.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutFrameCount.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutGL.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutGLextensions.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutReceiver.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutSender.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutSenderNames.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutSharedMemory.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\SpoutGL\SpoutUtils.h">
-      <Filter>SpoutGL</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Addons">
@@ -110,11 +41,9 @@
     <Filter Include="Addons\ofxSkyBox">
       <UniqueIdentifier>{2b64db67-52ec-43b5-8bab-21d39db6ed92}</UniqueIdentifier>
     </Filter>
-    <Filter Include="SpoutGL">
-      <UniqueIdentifier>{40684720-d5f5-4b90-bdcb-c8ae275b33ec}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="src\resource.rc" />
+    <ResourceCompile Include="src\SpoutShaders.rc" />
   </ItemGroup>
 </Project>

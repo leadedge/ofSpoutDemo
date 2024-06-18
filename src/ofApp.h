@@ -31,7 +31,7 @@
 
 #include "Addons\ofxSkybox\ofxSkyBox.h" // Skybox addon
 #include "Addons\ofxWinMenu\ofxWinMenu.h" // Windows menu addon
-#include "..\apps\SpoutGL\Spout.h" // Common for receiver and sender
+#include "..\include\Spout.h" // Common for receiver and sender
 #include "SpoutRecord.h" // FFmpeg recording
 #include "SpoutShaders.h" // Compute shaders
 

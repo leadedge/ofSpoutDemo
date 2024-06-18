@@ -93,17 +93,17 @@
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <PreprocessorDefinitions>_HAS_STD_BYTE=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level1</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;src\Addons\ofxWinMenu;src\Addons\ofxSkyBox\src;src\Nvapi\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;include;src\Addons\ofxWinMenu;src\Addons\ofxSkyBox\src;src\Nvapi\include</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>src\Nvapi\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Spout_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>lib;src\Nvapi\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -112,17 +112,17 @@
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <PreprocessorDefinitions>_HAS_STD_BYTE=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level1</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;src\Addons\ofxWinMenu;src\Addons\ofxSkyBox\src;src\Nvapi\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;include;src\Addons\ofxWinMenu;src\Addons\ofxSkyBox\src;src\Nvapi\include</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>src\Nvapi\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Spout_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>lib;src\Nvapi\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -130,8 +130,8 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <PreprocessorDefinitions>_HAS_STD_BYTE=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <WarningLevel>Level3</WarningLevel>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;src\Addons\ofxWinMenu;src\Addons\ofxSkyBox\src;src\Nvapi\include</AdditionalIncludeDirectories>
+      <WarningLevel>Level1</WarningLevel>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;include;src\Addons\ofxWinMenu;src\Addons\ofxSkyBox\src;src\Nvapi\include</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>
     <Link>
@@ -141,8 +141,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Spout_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
@@ -151,8 +151,8 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <PreprocessorDefinitions>_HAS_STD_BYTE=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <WarningLevel>Level3</WarningLevel>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;src\Addons\ofxWinMenu;src\Addons\ofxSkyBox\src;src\Nvapi\include</AdditionalIncludeDirectories>
+      <WarningLevel>Level1</WarningLevel>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;include;include;src\Addons\ofxWinMenu;src\Addons\ofxSkyBox\src;src\Nvapi\include</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -164,23 +164,12 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Spout_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\SpoutGL\Spout.cpp" />
-    <ClCompile Include="..\..\SpoutGL\SpoutCopy.cpp" />
-    <ClCompile Include="..\..\SpoutGL\SpoutDirectX.cpp" />
-    <ClCompile Include="..\..\SpoutGL\SpoutFrameCount.cpp" />
-    <ClCompile Include="..\..\SpoutGL\SpoutGL.cpp" />
-    <ClCompile Include="..\..\SpoutGL\SpoutGLextensions.cpp" />
-    <ClCompile Include="..\..\SpoutGL\SpoutReceiver.cpp" />
-    <ClCompile Include="..\..\SpoutGL\SpoutSender.cpp" />
-    <ClCompile Include="..\..\SpoutGL\SpoutSenderNames.cpp" />
-    <ClCompile Include="..\..\SpoutGL\SpoutSharedMemory.cpp" />
-    <ClCompile Include="..\..\SpoutGL\SpoutUtils.cpp" />
     <ClCompile Include="src\Addons\ofxSkybox\ofxCubeMap.cpp" />
     <ClCompile Include="src\Addons\ofxSkybox\ofxSkyBox.cpp" />
     <ClCompile Include="src\Addons\ofxWinMenu\ofxWinMenu.cpp" />
@@ -190,18 +179,6 @@
     <ClCompile Include="src\SpoutShaders.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\SpoutGL\Spout.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutCommon.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutCopy.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutDirectX.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutFrameCount.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutGL.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutGLextensions.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutReceiver.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutSender.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutSenderNames.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutSharedMemory.h" />
-    <ClInclude Include="..\..\SpoutGL\SpoutUtils.h" />
     <ClInclude Include="src\Addons\ofxSkybox\ofxCubeMap.h" />
     <ClInclude Include="src\Addons\ofxSkybox\ofxSkyBox.h" />
     <ClInclude Include="src\Addons\ofxWinMenu\ofxWinMenu.h" />
@@ -218,6 +195,7 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="src\resource.rc" />
+    <ResourceCompile Include="src\SpoutShaders.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
