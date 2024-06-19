@@ -84,7 +84,7 @@ Click "Download Build Tools" and save the file (vs_BuildTools.exe).
 
 Confirm the location of MSBuild.exe at :
 
-C:\Program Files\Microsoft Visual Studio\2022\Community\Msbuild\Current\Bin
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin
 
 MsBuild is run from the command line from a console window. Create an Environment Variable with this path so that you don't have to enter the full path all the time.
 
@@ -92,10 +92,7 @@ MsBuild is run from the command line from a console window. Create an Environmen
 - Click the "Environment variables" button.
 - In the top pane you will see the "Path" variable.
 - Double click this to bring up the "Edit environment variable" window.
-- Click "New" and enter the path as found above. Most likely it will be :
-
-C:\Program Files\Microsoft Visual Studio\2022\Community\Msbuild\Current\Bin
-
+- Click "New" and enter the path as found above.
 - Click OK to enter the new path and OK again to exit.
 
 Now MSbuild is ready to run from a console window without having to enter the full path.
