@@ -1,7 +1,7 @@
 
 //
 // Enable this define to create a receiver rather than a sender
-#define BUILDRECEIVER
+// #define BUILDRECEIVER
 //
 
 
