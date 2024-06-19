@@ -15,7 +15,7 @@ The project uses [ofxWinMenu](https://github.com/leadedge/ofxWinMenu) addon and 
 
 ## Building the project
 
-Refer for "BUILD.md" document for building with either Visual Studio or MSBuild.
+Refer to "BUILD.md" for building with either Visual Studio or MSBuild.
 
 
 
