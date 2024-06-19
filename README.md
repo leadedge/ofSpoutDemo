@@ -11,7 +11,7 @@ The latest [Release](https://github.com/leadedge/ofSpoutDemo/releases) contains 
 
 ## Addons
 
-The project uses [ofxWinMenu](https://github.com/leadedge/ofxWinMenu) addon and the [ofxSkybox](https://github.com/kalwalt/ofxSkyBox) addon Created by kalwalt alias Walter Perdan. The source for both of these is modified and included with the project.
+The project uses [ofxWinMenu](https://github.com/leadedge/ofxWinMenu) addon and the [ofxSkybox](https://github.com/kalwalt/ofxSkyBox) addon created by kalwalt alias Walter Perdan. The source for both of these is modified and included with the project.
 
 ## Building the project
 
