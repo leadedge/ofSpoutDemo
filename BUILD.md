@@ -3,17 +3,20 @@
 Although this project is open source, it is dependent on Openframeworks and Visual Studio. 
 If you familiar with Visual Studio and Openframeworks, the project solution file "ofSpoutDemo.sln" can be used directly.
 
-However, the project can also be built without the Visual Studio IDE using "MSBuild" with only one line from a command window. The following document shows how to do this without requiring any previous knowledge of Visual Studio or Openframeworks.
+However, the project can also be built without the Visual Studio IDE using "MSBuild". The following document shows how to do this without requiring any previous knowledge of Visual Studio or Openframeworks.
 
 ### Openframeworks
 
 #### Download
 
 - Download from https://openframeworks.cc/download/
-- Choose download openFrameworks for "visual studio"
+- Choose "windows > download openFrameworks for > visual studio.
+- This is the latest release. For example "of_v0.12.0_vs_release.zip".
 - Save the zip file to a convenient location for the build.
 - Right click on the zip file and "Extract all".
-- Remove "of_v0.12.0_vs_release" from the end of the extract path.<br>
+- You will be prompted to save to a folder with the same name as the zip file.
+- In this case, remove "of_v0.12.0_vs_release" from the end of the extract path.<br>
+so that you don't end up with a subfolder of the same name.
   This is a very large file and it can take some time to download.
 
 Finally you will have a new folder "of_v0.12.0_vs_release" with several sub-folders.
@@ -38,8 +41,8 @@ apps
  the Openframeworks project folder created above "of_v0.12.0_vs_release\apps\myApps"
 - If not, wait for the download to complete and move the zip file to that folder.
 - Right click and "Extract all"
-- Before extracting, remove "ofSpoutDemo-master" from the destination folder name.<br>
-This will create a folder "ofSpoutDemo-master" under "myApps".
+- As before, remove "ofSpoutDemo-master" from the end of the extract path.<br>
+This will create a single folder "ofSpoutDemo-master" under "myApps".
 - Remove "-master" from the folder name to create "ofSpoutDemo".
 - Now there will be a new project folder under "myApps".
 
@@ -86,7 +89,8 @@ Confirm the location of MSBuild.exe at :
 
 C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin
 
-MsBuild is run from the command line from a console window. Create an Environment Variable with this path so that you don't have to enter the full path all the time.
+MsBuild is run from a console window or batch file, and normally the full program file path is required, 
+but this can be avoided by creating an Environment Variable for the path.
 
 - In the search window enter "Environment" and choose<br>"Edit the system environment variables"
 - Click the "Environment variables" button.
@@ -95,7 +99,7 @@ MsBuild is run from the command line from a console window. Create an Environmen
 - Click "New" and enter the path as found above.
 - Click OK to enter the new path and OK again to exit.
 
-Now MSbuild is ready to run from a console window without having to enter the full path.
+Now MSbuild is ready to run without having to enter the full path.
 
 
 ## Build the Openframeworks library
@@ -105,7 +109,7 @@ and is located in :
 
 of_v0.12.0_vs_release\libs\openFrameworksCompiled\project\vs\
 
-- In File Explorer left click on the address bar to highlight this location
+- In File Explorer left click on an empty space in the address bar to highlight this location.
 - Type cmd to replace the highlighted text and press enter.<br>
 A command window will open in that folder.
 - Now type in or copy/paste :
@@ -122,9 +126,9 @@ Now the Openframeworks library is compiled.
 
 In File Explorer move to the project folder within Openframeworks :
 
-"of_v0.12.0_vs_release\apps\myApps\ofSpoutDemo" 
+"..\apps\myApps\ofSpoutDemo" 
 
-- As before, left click on the address bar to highlight the location
+- As before, left click on an empty space in the address bar to highlight the location.
 - Type "cmd" to replace the highlighted text and enter.
 - Type in or copy/paste :
 
@@ -133,12 +137,12 @@ MSBuild ofSpoutDemo.sln -p:Configuration=RELEASE -p:Platform=x64
 - Press enter to build.
 
 The build should succeed with 0 Warnings and 0 Errors.<br>
-You will find "ofSpoutDemo.exe" in the "ofSpoutDemo" folder.<br>
+Find "ofSpoutDemo.exe" in the "bin" folder.<br>
 This is a sender, rename the file to "SpoutSender.exe".
 
 ### Building a receiver
 
-- Find the file "of_v0.12.0_vs_release\apps\myApps\ofSpoutDemo\src\resource.h"
+- Find the file "..\apps\myApps\ofSpoutDemo\src\resource.h"
 - Open the file with a text editor<br>(Right click and choose "Edit" to use Windows Notepad).
 - Find the line : // #define BUILDRECEIVER
 - Remove the preceding comments to give : #define BUILDRECEIVER.
@@ -150,7 +154,8 @@ MSBuild ofSpoutDemo.sln -p:Configuration=RELEASE -p:Platform=x64
 
 - Press Enter to build.
 
-Rename "ofSpoutDemo.exe" in the "ofSpoutDemo" folder to "SpoutReceiver.exe"
+Find "ofSpoutDemo.exe" in the "bin" folder.<br>
+Rename the file to "SpoutReceiver.exe"
 
 The project build is now complete.
 
