@@ -1,10 +1,10 @@
 ## Building the project
 
-Although this project is open source, it is dependent on Openframeworks and Visual Studio. 
-If you familiar with Visual Studio and Openframeworks, the project solution file "ofSpoutDemo.sln" can be used directly
+This project is dependent on Openframeworks and Visual Studio. 
+If you familiar with both of these, the project solution file "ofSpoutDemo.sln" can be used directly
 after setting up Openframeworks and project folders as detailed below.
 
-However, the project can also be built without the Visual Studio IDE using "MSBuild". The following document shows how to do this without requiring any previous knowledge of Visual Studio or Openframeworks.
+The project can also be built without the Visual Studio IDE using "MSBuild". The following shows how to do this without requiring any previous knowledge of Visual Studio or Openframeworks.
 
 ### Openframeworks
 
