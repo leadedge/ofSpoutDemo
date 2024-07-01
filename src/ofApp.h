@@ -92,6 +92,7 @@ class ofApp : public ofBaseApp{
 		ofTexture myTexture; // Receiving texture
 		spoutShaders shaders; // For image adjust
 		ofImage myImage; // For image load
+		ofTexture lastTexture; // For Motion blur shader
 		void doFullScreen(bool bEnable, bool PreviewMode);
 
 		// Recording

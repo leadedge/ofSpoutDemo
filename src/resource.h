@@ -40,6 +40,7 @@
 #define IDC_GAMMA_TEXT       30002
 #define IDC_TEMPERATURE_TEXT 30003
 #define IDC_SHARPNESS_TEXT   30004
+
 #define IDC_RESET            30005
 #define IDC_RESTORE          30006
 #define IDC_MIRROR           30007
@@ -47,11 +48,14 @@
 #define IDC_BLUR_TEXT        30009
 #define IDC_BLOOM            30010
 #define IDC_BLOOM_TEXT       30011
-#define IDC_SHARPNESS_3x3    30012
-#define IDC_SHARPNESS_5x5    30013
-#define IDC_SHARPNESS_7x7    30014
-#define IDC_SWAP             30015
-#define IDC_ADAPTIVE         30016
+#define IDC_MOTION           30012
+#define IDC_MOTION_TEXT      30013
+#define IDC_SHARPNESS_3x3    30014
+#define IDC_SHARPNESS_5x5    30015
+#define IDC_SHARPNESS_7x7    30016
+#define IDC_SWAP             30017
+#define IDC_ADAPTIVE         30018
+
 
 #define IDC_IMAGE_TYPE      40000
 #define IDC_PROMPT          40001

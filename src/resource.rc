@@ -81,7 +81,7 @@ FONT 9, "Ms Shell Dlg", 0, 0, 1
 }
 
 
-IDD_ADJUSTBOX DIALOG 0, 0, 200, 210
+IDD_ADJUSTBOX DIALOG 0, 0, 200, 222
 STYLE DS_3DLOOK | DS_SHELLFONT | WS_CAPTION | WS_VISIBLE | WS_POPUP
 CAPTION "Adjust"
 FONT 9, "Microsoft Sans Serif"
@@ -104,30 +104,38 @@ FONT 9, "Microsoft Sans Serif"
         CONTROL         "", IDC_TEMPERATURE, TRACKBAR_CLASS, WS_TABSTOP | TBS_BOTH | TBS_NOTICKS, 60, 69, 100, 10, WS_EX_LEFT
         LTEXT           "Static", IDC_TEMPERATURE_TEXT, 164, 69, 18, 9, SS_LEFT, WS_EX_LEFT
         
-        GROUPBOX        "Process",           -1,   8,  88, 180, 24, 0, WS_EX_LEFT
-        LTEXT           "Blur",              -1,  17, 100, 33, 9, SS_LEFT, WS_EX_LEFT
-        CONTROL         "", IDC_BLUR, TRACKBAR_CLASS, WS_TABSTOP | TBS_BOTH | TBS_NOTICKS, 60, 100, 100, 10, WS_EX_LEFT
+        GROUPBOX        "Process",           -1,    8,  88, 180, 48, 0, WS_EX_LEFT
+        
+        LTEXT           "Blur",              -1,   17, 100, 33, 9, SS_LEFT, WS_EX_LEFT
+        CONTROL         "", IDC_BLUR, TRACKBAR_CLASS, WS_TABSTOP | TBS_BOTH | TBS_NOTICKS,     60, 100, 100, 10, WS_EX_LEFT
         LTEXT           "Static", IDC_BLUR_TEXT, 164, 100, 18, 9, SS_LEFT, WS_EX_LEFT
-        LTEXT           "Bloom",        -1, 17, 112, 33, 9, SS_LEFT, WS_EX_LEFT
-        CONTROL         "", IDC_BLOOM, TRACKBAR_CLASS, WS_TABSTOP | TBS_BOTH | TBS_NOTICKS, 60, 112, 100, 10, WS_EX_LEFT
+       
+        LTEXT           "Bloom",             -1,   17, 112, 33, 9, SS_LEFT, WS_EX_LEFT
+        CONTROL         "", IDC_BLOOM, TRACKBAR_CLASS, WS_TABSTOP | TBS_BOTH | TBS_NOTICKS,     60, 112, 100, 10, WS_EX_LEFT
         LTEXT           "Static", IDC_BLOOM_TEXT, 164, 112, 18, 9, SS_LEFT, WS_EX_LEFT
-        LTEXT           "Sharpen",         -1, 17, 124, 33, 9, SS_LEFT, WS_EX_LEFT
-        CONTROL         "", IDC_SHARPNESS, TRACKBAR_CLASS, WS_TABSTOP | TBS_BOTH | TBS_NOTICKS, 60, 124, 100, 10, WS_EX_LEFT
-        LTEXT           "Static", IDC_SHARPNESS_TEXT, 164, 124, 18, 9, SS_LEFT, WS_EX_LEFT
-        AUTORADIOBUTTON " 3 x 3", IDC_SHARPNESS_3x3,   28, 137, 30, 8, 0, WS_EX_LEFT
-        AUTORADIOBUTTON " 5 x 5", IDC_SHARPNESS_5x5,   65, 137, 30, 8, 0, WS_EX_LEFT
-        AUTORADIOBUTTON " 7 x 7", IDC_SHARPNESS_7x7,  102, 137, 30, 8, 0, WS_EX_LEFT
-        AUTOCHECKBOX    "Adaptive", IDC_ADAPTIVE,     139, 137, 40, 8, 0, WS_EX_LEFT
 
-        GROUPBOX        "Image",          -1,    8, 152, 180, 25, 0, WS_EX_LEFT
-        AUTOCHECKBOX    "Flip", IDC_FLIP,       28, 164,  24,  8, 0, WS_EX_LEFT
-        AUTOCHECKBOX    "Mirror", IDC_MIRROR,   55, 164,  32,  8, 0, WS_EX_LEFT
-        AUTOCHECKBOX    "Swap", IDC_SWAP,       88, 164,  28,  8, 0, WS_EX_LEFT
+        LTEXT           "Motion",            -1,   17, 124, 33, 9, SS_LEFT, WS_EX_LEFT
+        CONTROL         "", IDC_MOTION, TRACKBAR_CLASS, WS_TABSTOP | TBS_BOTH | TBS_NOTICKS,    60, 124, 100, 10, WS_EX_LEFT
+        LTEXT           "Static", IDC_MOTION_TEXT, 164, 124, 18, 9, SS_LEFT, WS_EX_LEFT
 
-        PUSHBUTTON      "Restore", IDC_RESTORE, 37, 187, 30, 14, 0, WS_EX_LEFT
-        PUSHBUTTON      "Reset", IDC_RESET,     68, 187, 30, 14, 0, WS_EX_LEFT
-        PUSHBUTTON      "OK", IDOK,             99, 187, 30, 14, 0, WS_EX_LEFT
-        PUSHBUTTON      "Cancel", IDCANCEL,    130, 187, 30, 14, 0, WS_EX_LEFT
+        
+        LTEXT           "Sharpen",         -1,     17, 136, 33, 9, SS_LEFT, WS_EX_LEFT
+        CONTROL         "", IDC_SHARPNESS, TRACKBAR_CLASS, WS_TABSTOP | TBS_BOTH | TBS_NOTICKS, 60, 136, 100, 10, WS_EX_LEFT
+        LTEXT           "Static", IDC_SHARPNESS_TEXT, 164, 136, 18, 9, SS_LEFT, WS_EX_LEFT
+        AUTORADIOBUTTON " 3 x 3", IDC_SHARPNESS_3x3,   28, 149, 30, 8, 0, WS_EX_LEFT
+        AUTORADIOBUTTON " 5 x 5", IDC_SHARPNESS_5x5,   65, 149, 30, 8, 0, WS_EX_LEFT
+        AUTORADIOBUTTON " 7 x 7", IDC_SHARPNESS_7x7,  102, 149, 30, 8, 0, WS_EX_LEFT
+        AUTOCHECKBOX    "Adaptive", IDC_ADAPTIVE,     139, 149, 40, 8, 0, WS_EX_LEFT
+
+        GROUPBOX        "Image",          -1,    8, 164, 180, 25, 0, WS_EX_LEFT
+        AUTOCHECKBOX    "Flip", IDC_FLIP,       28, 176,  24,  8, 0, WS_EX_LEFT
+        AUTOCHECKBOX    "Mirror", IDC_MIRROR,   55, 176,  32,  8, 0, WS_EX_LEFT
+        AUTOCHECKBOX    "Swap", IDC_SWAP,       88, 176,  28,  8, 0, WS_EX_LEFT
+
+        PUSHBUTTON      "Restore", IDC_RESTORE, 37, 199, 30, 14, 0, WS_EX_LEFT
+        PUSHBUTTON      "Reset", IDC_RESET,     68, 199, 30, 14, 0, WS_EX_LEFT
+        PUSHBUTTON      "OK", IDOK,             99, 199, 30, 14, 0, WS_EX_LEFT
+        PUSHBUTTON      "Cancel", IDCANCEL,    130, 199, 30, 14, 0, WS_EX_LEFT
 }
 
 

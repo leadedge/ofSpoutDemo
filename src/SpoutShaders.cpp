@@ -47,6 +47,8 @@
 			   Create SpoutShaders.rc with file definitions
 			   Create "SHADERS" as a subfolder of "src" containing the shader files
 	30.04.24 - SetGLformat - allow for GL_RGB10_A2
+	23.06.24 - Add rgba2yuv
+	30.06.24 - Add motion blur
 
 */
 
@@ -73,6 +75,8 @@ spoutShaders::spoutShaders() {
 	m_sharpenstr  = LoadResourceFile(9);
 	m_casstr      = LoadResourceFile(10);
 	m_kuwaharastr = LoadResourceFile(11);
+	m_rgba2yuvstr = LoadResourceFile(12);
+	m_motionstr   = LoadResourceFile(13);
 }
 
 
@@ -88,8 +92,10 @@ spoutShaders::~spoutShaders() {
 	if (m_vBlurProgram    > 0) glDeleteProgram(m_vBlurProgram);
 	if (m_sharpenProgram  > 0) glDeleteProgram(m_sharpenProgram);
 	if (m_casProgram      > 0) glDeleteProgram(m_casProgram);
-	if (m_kuwaharaProgram > 0) glDeleteProgram(m_kuwaharaProgram);
 	if (m_bloomProgram    > 0) glDeleteProgram(m_bloomProgram);
+	if (m_kuwaharaProgram > 0) glDeleteProgram(m_kuwaharaProgram);
+	if (m_rgba2yuvProgram > 0) glDeleteProgram(m_rgba2yuvProgram);
+	if (m_motionProgram   > 0) glDeleteProgram(m_motionProgram);
 }
 
 //---------------------------------------------------------
@@ -122,7 +128,7 @@ bool spoutShaders::Flip(GLuint SourceID, unsigned int width, unsigned int height
 //    Mirror image in place
 bool spoutShaders::Mirror(GLuint SourceID, unsigned int width, unsigned int height, bool bSwap)
 {
-	return ComputeShader(m_mirrorstr, m_mirrorProgram, SourceID, 0, width, height);
+	return ComputeShader(m_mirrorstr, m_mirrorProgram, SourceID, 0, width, height, bSwap);
 }
 
 //---------------------------------------------------------
@@ -236,6 +242,29 @@ bool spoutShaders::Kuwahara(GLuint SourceID, GLuint DestID,
 }
 
 //---------------------------------------------------------
+// Function: Rgb2yuv
+//     Convert rgb to yuv
+//     amount - 1 - 4 typical
+bool spoutShaders::Rgba2yuv(GLuint SourceID, GLuint DestID,
+	unsigned int width, unsigned int height)
+{
+	return ComputeShader(m_rgba2yuvstr, m_rgba2yuvProgram,
+		SourceID, DestID, width, height);
+}
+
+//---------------------------------------------------------
+// Function: Motion
+//     Motion blur
+//     amount - 0 - 10
+bool spoutShaders::Motion(GLuint SourceID, GLuint DestID,
+	unsigned int width, unsigned int height, float amount)
+{
+	return ComputeShader(m_motionstr, m_motionProgram,
+		SourceID, DestID, width, height, amount);
+}
+
+
+//---------------------------------------------------------
 // Function: SetGLformat
 // Set OpenGL format for shaders
 // GL_RGBA8, GL_RGB10_A2, GL_RGBA16, GL_RGBA16F, GL_RGBA32F
@@ -287,8 +316,10 @@ void spoutShaders::SetGLformat(GLint glformat)
 	if (m_vBlurProgram    > 0) glDeleteProgram(m_vBlurProgram);
 	if (m_sharpenProgram  > 0) glDeleteProgram(m_sharpenProgram);
 	if (m_casProgram      > 0) glDeleteProgram(m_casProgram);
-	if (m_kuwaharaProgram > 0) glDeleteProgram(m_kuwaharaProgram);
 	if (m_bloomProgram    > 0) glDeleteProgram(m_bloomProgram);
+	if (m_kuwaharaProgram > 0) glDeleteProgram(m_kuwaharaProgram);
+	if (m_rgba2yuvProgram > 0) glDeleteProgram(m_rgba2yuvProgram);
+	if (m_motionProgram   > 0) glDeleteProgram(m_motionProgram);
 	m_copyProgram     = 0;
 	m_swapProgram     = 0;
 	m_flipProgram     = 0;
@@ -299,8 +330,10 @@ void spoutShaders::SetGLformat(GLint glformat)
 	m_hBlurProgram    = 0;
 	m_vBlurProgram    = 0;
 	m_sharpenProgram  = 0;
-	m_kuwaharaProgram = 0;
 	m_bloomProgram    = 0;
+	m_kuwaharaProgram = 0;
+	m_rgba2yuvProgram = 0;
+	m_motionProgram   = 0;
 
 	if (m_GLformat != oldformat) {
 		SpoutLogNotice("spoutShaders::SetGLformat - shader format reset from 0x%X (%s) to 0x%X (%s)",
@@ -353,8 +386,13 @@ bool spoutShaders::ComputeShader(std::string &shaderstr, GLuint &program,
 	GLuint SourceID, GLuint DestID, unsigned int width, unsigned int height,
 	float uniform0, float uniform1, float uniform2, float uniform3)
 {
-	if (shaderstr.empty() || SourceID == 0) {
-		SpoutLogWarning("spoutShaders::ComputeShader - no shader or texture");
+	if (shaderstr.empty()) {
+		SpoutLogWarning("spoutShaders::ComputeShader - no shade");
+		return false;
+	}
+
+	if (SourceID == 0) {
+		SpoutLogWarning("spoutShaders::ComputeShader - no source texture");
 		return false;
 	}
 
@@ -531,6 +569,8 @@ std::string spoutShaders::GetFileString(const char* filepath)
 //		sharpen
 //		cas
 //		kuwahara
+//		rgba2yuv
+//		motion
 //
 std::string spoutShaders::LoadResourceFile(int index)
 {

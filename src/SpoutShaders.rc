@@ -25,6 +25,8 @@
 #define IDC_SHADERFILE9		1009 // sharpen
 #define IDC_SHADERFILE10	1010 // cas
 #define IDC_SHADERFILE11	1011 // kuwahara
+#define IDC_SHADERFILE12	1012 // rgba2yuv
+#define IDC_SHADERFILE13	1013 // motion
 
 IDC_SHADERFILE0  RCDATA "SHADERS/copy.glsl"		// m_copystr
 IDC_SHADERFILE1  RCDATA "SHADERS/flip.glsl"		// m_flipstr
@@ -38,5 +40,7 @@ IDC_SHADERFILE8  RCDATA "SHADERS/bloom.glsl"    // m_bloomstr;
 IDC_SHADERFILE9  RCDATA "SHADERS/sharpen.glsl"	// m_sharpenstr;
 IDC_SHADERFILE10 RCDATA "SHADERS/cas.glsl"		// m_casstr;
 IDC_SHADERFILE11 RCDATA "SHADERS/kuwahara.glsl" // m_kuwaharastr;
+IDC_SHADERFILE12 RCDATA "SHADERS/rgba2yuv.glsl" // m_rgba2yuvstr;
+IDC_SHADERFILE13 RCDATA "SHADERS/motion.glsl"   // m_motionstr;
 
 // =====================================================================================

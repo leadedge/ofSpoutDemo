@@ -135,6 +135,8 @@
 			   and open a MessageBox for selection
 			   Version 1.022
 	18.06.24 - Use Spout_static.lib instead of SpoutGL source files
+	29.05.24 - UserAdjust - bReopen static
+	01.07.24 - Add motion blur shader
 			   Version 1.023
 
 
@@ -211,6 +213,7 @@ static float Gamma       = 1.0;
 static float Temp        = 6500.0; // daylight
 static float Blur        = 0.0;
 static float Bloom       = 0.0;
+static float Motion      = 0.0;
 static float Sharpness   = 0.0;
 static float Sharpwidth  = 3.0; // 3x3, 5x5, 7x7
 static bool bAdaptive    = false; // CAS adaptive sharpen
@@ -225,6 +228,7 @@ static float OldGamma      = 1.0;
 static float OldTemp       = 6500.0;
 static float OldBlur       = 0.0;
 static float OldBloom      = 0.0;
+static float OldMotion     = 0.0;
 static float OldSharpness  = 0.0;
 static float OldSharpwidth = 3.0;
 static bool OldAdaptive    = false;
@@ -239,7 +243,7 @@ void ofApp::setup() {
 	ofBackground(0, 0, 0);
 
 	// OpenSpoutConsole(); // Empty console for debugging
-	// EnableSpoutLog(); // Log to console
+	EnableSpoutLog(); // Log to console
 	// SetSpoutLogLevel(SpoutLogLevel::SPOUT_LOG_WARNING); // Log warnings only
 	
 #ifdef BUILDRECEIVER
@@ -530,6 +534,9 @@ void ofApp::draw() {
 			// Set OpenGL format for shaders
 			shaders.SetGLformat(glFormat);
 
+			// Allocate a texture accumulator for motion blur
+			lastTexture.allocate(receiver.GetSenderWidth(), receiver.GetSenderHeight(), glFormat);
+
 			// Stop recording if the sender name or size has changed
 			if (strcmp(receiver.GetSenderName(), senderName) != 0
 				|| senderWidth != receiver.GetSenderWidth()
@@ -606,6 +613,10 @@ void ofApp::draw() {
 			// Blur 0 - 1  (default 0)
 			if (Bloom > 0.0)
 				shaders.Bloom(textureID, width, height, Bloom);
+
+			// Motion 0 - 1  (limited to 0.98 by shader, default 0)
+			if (Motion > 0.0)
+				shaders.Motion(lastTexture.getTextureData().textureID, textureID, width, height, Motion);
 
 			if (bFlip)
 				shaders.Flip(textureID, width, height);
@@ -1226,6 +1237,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 				OldTemp       = Temp;
 				OldBlur       = Blur;
 				OldBloom      = Bloom;
+				OldMotion     = Motion;
 				OldSharpness  = Sharpness;
 				OldSharpwidth = Sharpwidth;
 				OldAdaptive   = bAdaptive;
@@ -1903,6 +1915,8 @@ void ofApp::WriteInitFile(const char* initfile)
 	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Blur", (LPCSTR)tmp, (LPCSTR)initfile);
 	sprintf_s(tmp, MAX_PATH, "%.3f", Bloom);
 	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Bloom", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Motion);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Motion", (LPCSTR)tmp, (LPCSTR)initfile);
 	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpness);
 	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Sharpness", (LPCSTR)tmp, (LPCSTR)initfile);
 	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpwidth);
@@ -2002,6 +2016,8 @@ void ofApp::ReadInitFile(const char* initfile)
 	if (tmp[0]) Blur = (float)atof(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Bloom", NULL, (LPSTR)tmp, 8, initfile);
 	if (tmp[0]) Bloom = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Motion", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Motion = (float)atof(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpness", NULL, (LPSTR)tmp, 8, initfile);
 	if (tmp[0]) Sharpness = (float)atof(tmp);
 	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpwidth", NULL, (LPSTR)tmp, 8, initfile);
@@ -2451,7 +2467,7 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 	RECT drect{};
 	int x = 0;
 	int y = 0;
-	bool bReopen = false;
+	static bool bReopen = false;
 
 	switch (message) {
 
@@ -2552,6 +2568,15 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 		sprintf_s(str1, 256, "%.3f", Bloom);
 		SetDlgItemTextA(hDlg, IDC_BLOOM_TEXT, (LPCSTR)str1);
 
+		hBar = GetDlgItem(hDlg, IDC_MOTION);
+		SendMessage(hBar, TBM_SETRANGEMIN, (WPARAM)1, (LPARAM)0);
+		SendMessage(hBar, TBM_SETRANGEMAX, (WPARAM)1, (LPARAM)100);
+		SendMessage(hBar, TBM_SETPAGESIZE, (WPARAM)1, (LPARAM)10);
+		iPos = (int)(Motion * 100.0f);
+		SendMessage(hBar, TBM_SETPOS, (WPARAM)1, (LPARAM)iPos);
+		sprintf_s(str1, 256, "%.3f", Motion);
+		SetDlgItemTextA(hDlg, IDC_MOTION_TEXT, (LPCSTR)str1);
+
 		// Sharpness width radio buttons
 		// 3x3, 5x5, 7x7
 		iPos = ((int)Sharpwidth-3)/2; // 0, 1, 2
@@ -2640,6 +2665,13 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			sprintf_s(str1, 256, "%.3f", fValue);
 			SetDlgItemTextA(hDlg, IDC_BLOOM_TEXT, (LPCSTR)str1);
 		}
+		else if (hBar == GetDlgItem(hDlg, IDC_MOTION)) {
+			iPos = SendMessage(hBar, TBM_GETPOS, 0, 0);
+			fValue = ((float)iPos) / 100.0f;
+			Motion = fValue;
+			sprintf_s(str1, 256, "%.3f", fValue);
+			SetDlgItemTextA(hDlg, IDC_MOTION_TEXT, (LPCSTR)str1);
+		}
 		break;
 
 	case WM_DESTROY:
@@ -2702,6 +2734,7 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			Temp       = OldTemp;
 			Blur       = OldBlur;
 			Bloom      = OldBloom;
+			Motion     = OldMotion;
 			Sharpness  = OldSharpness;
 			Sharpwidth = OldSharpwidth;
 			bAdaptive  = OldAdaptive;
@@ -2720,6 +2753,7 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			Temp       = 6500.0; // 3500 - 9500 default 6500 (daylight)
 			Blur       = 0.0; //  0 - 4 default 0
 			Bloom      = 0.0; //  0 - 1 default 0
+			Motion     = 0.0; //  0 - 1 default 0
 			Sharpness  = 0.0; //  0 - 1 default 0
 			Sharpwidth = 3.0; //  3,5,7 default 3
 			bAdaptive  = false;
@@ -2743,6 +2777,7 @@ LRESULT CALLBACK UserAdjust(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			Temp       = OldTemp;
 			Blur       = OldBlur;
 			Bloom      = OldBloom;
+			Motion     = OldMotion;
 			Sharpness  = OldSharpness;
 			Sharpwidth = OldSharpwidth;
 			bAdaptive  = OldAdaptive;

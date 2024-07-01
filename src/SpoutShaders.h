@@ -35,10 +35,9 @@
 
 #include <windows.h>
 #include <algorithm> // for std::replace
+
 // Change path as necessary
 #include "..\include\SpoutGLextensions.h"
-#include "..\include\SpoutCommon.h"
-#include "..\include\SpoutUtils.h"
 
 using namespace spoututils;
 
@@ -59,8 +58,11 @@ using namespace spoututils;
 #define IDC_SHADERFILE9		1009 // sharpen
 #define IDC_SHADERFILE10	1010 // cas
 #define IDC_SHADERFILE11	1011 // kuwahara
+#define IDC_SHADERFILE12	1012 // rgba2yuv
+#define IDC_SHADERFILE13	1013 // motion
 
-class SPOUT_DLLEXP spoutShaders {
+
+class spoutShaders {
 
 	public:
 
@@ -112,6 +114,14 @@ class SPOUT_DLLEXP spoutShaders {
 		bool Kuwahara(GLuint SourceID, GLuint DestID, 
 			unsigned int width, unsigned int height, float amount);
 
+		// Rgba2yuv
+		bool Rgba2yuv(GLuint SourceID, GLuint DestID,
+			unsigned int width, unsigned int height);
+
+		// Motion blur
+		bool Motion(GLuint SourceID, GLuint DestID,
+			unsigned int width, unsigned int height, float amount);
+
 		// Shader format
 		void SetGLformat(GLint glformat);
 
@@ -138,8 +148,10 @@ class SPOUT_DLLEXP spoutShaders {
 		GLuint m_vBlurProgram    = 0;
 		GLuint m_sharpenProgram  = 0;
 		GLuint m_casProgram      = 0;
-		GLuint m_kuwaharaProgram = 0;
 		GLuint m_bloomProgram    = 0;
+		GLuint m_kuwaharaProgram = 0;
+		GLuint m_rgba2yuvProgram = 0;
+		GLuint m_motionProgram   = 0;
 
 		// Formats
 		GLint m_GLformat = GL_RGBA8;
@@ -156,8 +168,10 @@ class SPOUT_DLLEXP spoutShaders {
 		std::string m_vblurstr;
 		std::string m_sharpenstr;
 		std::string m_casstr;
-		std::string m_kuwaharastr;
 		std::string m_bloomstr;
+		std::string m_kuwaharastr;
+		std::string m_rgba2yuvstr;
+		std::string m_motionstr;
 
 };
 
