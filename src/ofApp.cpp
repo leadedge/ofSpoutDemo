@@ -138,6 +138,8 @@
 	29.05.24 - UserAdjust - bReopen static
 	01.07.24 - Add motion blur shader
 			   Version 1.023
+	17.07.24 - Receiver : if receiving from self, get the next sender in the list
+			   Version 1.024
 
 
     =========================================================================
@@ -243,7 +245,7 @@ void ofApp::setup() {
 	ofBackground(0, 0, 0);
 
 	// OpenSpoutConsole(); // Empty console for debugging
-	EnableSpoutLog(); // Log to console
+	// EnableSpoutLog(); // Log to console
 	// SetSpoutLogLevel(SpoutLogLevel::SPOUT_LOG_WARNING); // Log warnings only
 	
 #ifdef BUILDRECEIVER
@@ -509,8 +511,21 @@ void ofApp::draw() {
 
 	// If re-sending do not receive from self
 	if (bResend && strstr(receiver.GetSenderName(), g_ReceiverName) != 0) {
-		// Release the receiving sender and receive from the next
-		sender.ReleaseSender();
+		// Receive from the next sender in the list
+		int n = receiver.GetSenderCount();
+		if (n > 1) {
+			char sendername[256];
+			for (int i=0; i<n; i++) {
+				if (receiver.GetSender(i, sendername)) {
+					if (strstr(sendername, "g_ReceiverName") == 0) {
+						receiver.SetReceiverName(sendername);
+					}
+				}
+			}
+		}
+		else {
+			return;
+		}
 	}
 
 	// ReceiveTexture connects to and receives from a sender
