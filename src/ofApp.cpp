@@ -137,10 +137,9 @@
 	18.06.24 - Use Spout_static.lib instead of SpoutGL source files
 	29.05.24 - UserAdjust - bReopen static
 	01.07.24 - Add motion blur shader
-			   Version 1.023
 	17.07.24 - Receiver : if receiving from self, get the next sender in the list
-			   Version 1.024
-
+	16.08.24 - Add Enable logs / Copy logs
+			   Version 1.023
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
@@ -255,13 +254,11 @@ void ofApp::setup() {
 	receiver.GetAdapterName(adapterIndex, adapterName, 256);
 	// Show the application title
 	ofSetWindowTitle("Spout Receiver");
-	EnableSpoutLogFile("SpoutReceiver.log"); // Log to file
 #else
 	strcpy_s(senderName, 256, "Spout Sender"); // The sender name
 	adapterIndex = sender.GetAdapter();
 	sender.GetAdapterName(adapterIndex, adapterName, 256);
 	ofSetWindowTitle("Spout Sender");
-	EnableSpoutLogFile("Spout Sender.log"); // Log to file
 #endif
 
 	// Instance
@@ -341,6 +338,10 @@ void ofApp::setup() {
 	menu->AddPopupItem(hPopup, "Show info", true); // Checked, auto-check
 #endif
 
+	bShowLogs = false;
+	menu->AddPopupItem(hPopup, "Enable logs", false);  // Unchecked, auto-check
+	menu->AddPopupItem(hPopup, "Copy logs", false, false);
+
 	//
 	// "Help" popup
 	//
@@ -392,13 +393,6 @@ void ofApp::setup() {
 	if (_access(g_FFmpegPath.c_str(), 0) == -1) {
 		g_FFmpegPath.clear(); // disable functions using FFmpeg
 	}
-
-	// SpoutReceiver.ini file path
-	strcpy_s(g_Initfile, MAX_PATH, g_ExePath);
-	strcat_s(g_Initfile, MAX_PATH, "\\SpoutReceiver.ini");
-
-	// Read options and menu settings
-	ReadInitFile(g_Initfile);
 
 	// Set the sender name for re-sending
 	sender.SetSenderName(g_ReceiverName);
@@ -461,6 +455,18 @@ void ofApp::setup() {
 	easycam.setControlArea(controlArea);
 #endif
 
+	// Common
+	// ini file path
+	strcpy_s(g_Initfile, MAX_PATH, GetExePath().c_str());
+#ifdef BUILDRECEIVER
+	strcat_s(g_Initfile, MAX_PATH, "\\SpoutReceiver.ini");
+#else
+	strcat_s(g_Initfile, MAX_PATH, "\\SpoutSender.ini");
+#endif
+
+	// Read options and menu settings
+	ReadInitFile(g_Initfile);
+
 	// Centre messagebox dialogs on the window
 	SpoutMessageBoxWindow(ofGetWin32Window());
 
@@ -514,10 +520,10 @@ void ofApp::draw() {
 		// Receive from the next sender in the list
 		int n = receiver.GetSenderCount();
 		if (n > 1) {
-			char sendername[256];
+			char sendername[256]{};
 			for (int i=0; i<n; i++) {
 				if (receiver.GetSender(i, sendername)) {
-					if (strstr(sendername, "g_ReceiverName") == 0) {
+					if (strstr(sendername, g_ReceiverName) == 0) {
 						receiver.SetReceiverName(sendername);
 					}
 				}
@@ -875,12 +881,14 @@ void ofApp::exit() {
 
 	StopRecording();
 	receiver.ReleaseReceiver();
-	// Save capture and recording settings
-	WriteInitFile(g_Initfile);
-
 #else
 	sender.ReleaseSender();
 #endif
+
+	// Save all settings
+	// Receiver - capture and recording settings
+	// Sender - show logs option
+	WriteInitFile(g_Initfile);
 
 }
 
@@ -1073,7 +1081,7 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 			SpoutMessageBox(g_hWnd, "No sender", "Spout Receiver", MB_OK | MB_ICONWARNING | MB_TOPMOST, 1500);
 		}
 	}
-	
+
 	//
 	// View menu
 	//
@@ -1132,6 +1140,16 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 
 	if (title == "Sender format") {
 		SelectSenderFormat();
+	}
+
+	if (title == "Sender Logs") {
+		std::string logs = GetSpoutLog();
+		SpoutMessageBoxButton(1000, L"Copy");
+		int iRet = SpoutMessageBox(ofGetWin32Window(), logs.c_str(), "Application logs", MB_OK);
+		if (iRet == 1000) {
+			CopyToClipBoard(NULL, logs.c_str());
+			SpoutMessageBox("Logs copied to the clipboard");
+		}
 	}
 
 #endif
@@ -1194,6 +1212,38 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 		bShowInfo = bChecked;
 	}
 
+	// LJ DEBUG
+	if (title == "Enable logs") {
+		bShowLogs = bChecked;
+		if (bShowLogs) {
+			EnableSpoutLog();
+			menu->SetPopupItem("Enable logs", true);
+			menu->EnablePopupItem("Copy logs", true);
+#ifdef BUILDRECEIVER
+			EnableSpoutLogFile("Spout Demo Receiver.log"); // Log to file
+#else
+			EnableSpoutLogFile("Spout Demo Sender.log"); // Log to file
+#endif
+			SpoutMessageBox("Restart the application to show initial logs");
+		}
+		else {
+			DisableSpoutLog();
+			menu->SetPopupItem("Enable logs", false);
+			menu->EnablePopupItem("Copy logs", false);
+		}
+	}
+
+	if (title == "Copy logs") {
+		if (bShowLogs) {
+			std::string logs = GetSpoutLog();
+			SpoutMessageBoxButton(1000, L"Copy");
+			int iRet = SpoutMessageBox(ofGetWin32Window(), logs.c_str(), "Application logs", MB_OK);
+			if (iRet == 1000) {
+				CopyToClipBoard(NULL, logs.c_str());
+				SpoutMessageBox("Logs copied to the clipboard");
+			}
+		}
+	}
 
 	//
 	// Help menu
@@ -1860,223 +1910,6 @@ void ofApp::SaveImageFile(std::string name)
 
 }
 
-//--------------------------------------------------------------
-// Save a configuration file in the executable folder
-// Ini file is created if it does not exist
-void ofApp::WriteInitFile(const char* initfile)
-{
-	char tmp[MAX_PATH]={0};
-
-	// Capture options
-	if (extension == ".tif")
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".tif", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".png", (LPCSTR)initfile);
-	// Recording options
-	if (bPrompt)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"0", (LPCSTR)initfile);
-	if (bShowFile)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Showfile", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Showfile", (LPCSTR)"0", (LPCSTR)initfile);
-	if (bDuration)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Duration", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Duration", (LPCSTR)"0", (LPCSTR)initfile);
-
-	sprintf_s(tmp, MAX_PATH, "%8ld", SecondsDuration);
-	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Seconds", (LPCSTR)tmp, (LPCSTR)initfile);
-
-	if (bAudio)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"0", (LPCSTR)initfile);
-	if (codec == 1)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"0", (LPCSTR)initfile);
-	if (quality == 0)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"0", (LPCSTR)initfile);
-	else if (quality == 1)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"2", (LPCSTR)initfile);
-	if (chroma == 0)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Chroma", (LPCSTR)"0", (LPCSTR)initfile);
-	else if (chroma == 1)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Chroma", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Chroma", (LPCSTR)"2", (LPCSTR)initfile);
-
-	sprintf_s(tmp, MAX_PATH, "%d", preset);
-	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Preset", (LPCSTR)tmp, (LPCSTR)initfile);
-	sprintf_s(tmp, MAX_PATH, "%d", imagetype);
-	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)tmp, (LPCSTR)initfile);
-
-	// Image adjustment
-	sprintf_s(tmp, MAX_PATH, "%.3f", Brightness);
-	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Brightness", (LPCSTR)tmp, (LPCSTR)initfile);
-	sprintf_s(tmp, MAX_PATH, "%.3f", Contrast);
-	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Contrast", (LPCSTR)tmp, (LPCSTR)initfile);
-	sprintf_s(tmp, MAX_PATH, "%.3f", Saturation);
-	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Saturation", (LPCSTR)tmp, (LPCSTR)initfile);
-	sprintf_s(tmp, MAX_PATH, "%.3f", Gamma);
-	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Gamma", (LPCSTR)tmp, (LPCSTR)initfile);
-	sprintf_s(tmp, MAX_PATH, "%.3f", Temp);
-	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Temp", (LPCSTR)tmp, (LPCSTR)initfile);
-	sprintf_s(tmp, MAX_PATH, "%.3f", Blur);
-	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Blur", (LPCSTR)tmp, (LPCSTR)initfile);
-	sprintf_s(tmp, MAX_PATH, "%.3f", Bloom);
-	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Bloom", (LPCSTR)tmp, (LPCSTR)initfile);
-	sprintf_s(tmp, MAX_PATH, "%.3f", Motion);
-	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Motion", (LPCSTR)tmp, (LPCSTR)initfile);
-	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpness);
-	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Sharpness", (LPCSTR)tmp, (LPCSTR)initfile);
-	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpwidth);
-	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Sharpwidth", (LPCSTR)tmp, (LPCSTR)initfile);
-	if (bAdaptive)
-		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Adaptive", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Adaptive", (LPCSTR)"0", (LPCSTR)initfile);
-	if (bFlip)
-		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Flip", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Flip", (LPCSTR)"0", (LPCSTR)initfile);
-	if (bMirror)
-		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Mirror", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Mirror", (LPCSTR)"0", (LPCSTR)initfile);
-	if (bSwap)
-		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Swap", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Swap", (LPCSTR)"0", (LPCSTR)initfile);
-
-	// Options
-	if (bShowInfo)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Info", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Info", (LPCSTR)"0", (LPCSTR)initfile);
-
-	if (bTopmost)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Topmost", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Topmost", (LPCSTR)"0", (LPCSTR)initfile);
-
-	//
-	// Receiver sending options
-	//
-
-	// Re-send
-	if (bResend)
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resend", (LPCSTR)"1", (LPCSTR)initfile);
-	else
-		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resend", (LPCSTR)"0", (LPCSTR)initfile);
-
-	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Receivername", (LPCSTR)g_ReceiverName, (LPCSTR)initfile);
-
-}
-
-
-//--------------------------------------------------------------
-// Read back settings from configuration file
-void ofApp::ReadInitFile(const char* initfile)
-{
-	char tmp[MAX_PATH]={0};
-
-	// Capture options
-	extension = ".png";
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Imagetype", NULL, (LPSTR)tmp, 5, initfile);
-	if (tmp[0]) imagetype = atoi(tmp);
-	extension = imagetypes[imagetype];
-	
-	// Recording options
-	bPrompt = false; bShowFile = false; bDuration=false; SecondsDuration=0L;
-	bAudio = false; codec = 1; quality = 1; chroma = 2; preset = 0;
-	
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Prompt", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bPrompt = (atoi(tmp) == 1);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Showfile", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bShowFile = (atoi(tmp) == 1);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Duration", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bDuration = (atoi(tmp) == 1);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Seconds", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) SecondsDuration = atol(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Audio", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bAudio = (atoi(tmp) == 1);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Codec", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) codec = atoi(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Quality", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) quality = atoi(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Chroma", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) chroma = atoi(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Preset", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) preset = atoi(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Imagetype", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) imagetype = atoi(tmp);
-
-	// Image dajustment
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Brightness", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) Brightness = (float)atof(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Contrast", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) Contrast = (float)atof(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Saturation", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) Saturation = (float)atof(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Gamma", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) Gamma = (float)atof(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Temp", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0])Temp = (float)atof(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Blur", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) Blur = (float)atof(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Bloom", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) Bloom = (float)atof(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Motion", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) Motion = (float)atof(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpness", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) Sharpness = (float)atof(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpwidth", NULL, (LPSTR)tmp, 8, initfile);
-	if (tmp[0]) Sharpwidth = (float)atof(tmp);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Adaptive", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bAdaptive = (atoi(tmp) == 1);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"bFlip", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bFlip = (atoi(tmp) == 1);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"bMirror", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bMirror = (atoi(tmp) == 1);
-	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"bSwap", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bSwap = (atoi(tmp) == 1);
-
-	// Menu options
-	bShowInfo = true; bTopmost = false;
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Info", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bShowInfo = (atoi(tmp) == 1);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Topmost", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bTopmost = (atoi(tmp) == 1);
-	
-	// Receiver sending options
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Resend", NULL, (LPSTR)tmp, 3, initfile);
-	if (tmp[0]) bResend = (atoi(tmp) == 1);
-	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Receivername", NULL, (LPSTR)tmp, 256, initfile);
-	if (tmp[0]) strcpy_s(g_ReceiverName, 256, tmp);
-
-	// Check menu items
-	if (extension == ".tif") {
-		menu->SetPopupItem("tif", true);
-		menu->SetPopupItem("png", false);
-	}
-	else {
-		menu->SetPopupItem("tif", false);
-		menu->SetPopupItem("png", true);
-	}
-	if (bShowInfo)
-		menu->SetPopupItem("Show info", true);
-	else
-		menu->SetPopupItem("Show info", false);
-
-	// Set topmost or not
-	appMenuFunction("Show on top", bTopmost);
-
-}
 #else
 
 //--------------------------------------------------------------
@@ -2206,6 +2039,254 @@ bool ofApp::SelectSenderFormat()
 }
 
 #endif
+
+// Common
+//--------------------------------------------------------------
+// Save a configuration file in the executable folder
+// Ini file is created if it does not exist
+void ofApp::WriteInitFile(const char* initfile)
+{
+	char tmp[MAX_PATH]={ 0 };
+
+#ifdef BUILDRECEIVER
+
+	// Capture options
+	if (extension == ".tif")
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".tif", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)".png", (LPCSTR)initfile);
+	// Recording options
+	if (bPrompt)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Prompt", (LPCSTR)"0", (LPCSTR)initfile);
+	if (bShowFile)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Showfile", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Showfile", (LPCSTR)"0", (LPCSTR)initfile);
+	if (bDuration)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Duration", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Duration", (LPCSTR)"0", (LPCSTR)initfile);
+
+	sprintf_s(tmp, MAX_PATH, "%8ld", SecondsDuration);
+	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Seconds", (LPCSTR)tmp, (LPCSTR)initfile);
+
+	if (bAudio)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Audio", (LPCSTR)"0", (LPCSTR)initfile);
+	if (codec == 1)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Codec", (LPCSTR)"0", (LPCSTR)initfile);
+	if (quality == 0)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"0", (LPCSTR)initfile);
+	else if (quality == 1)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Quality", (LPCSTR)"2", (LPCSTR)initfile);
+	if (chroma == 0)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Chroma", (LPCSTR)"0", (LPCSTR)initfile);
+	else if (chroma == 1)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Chroma", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Chroma", (LPCSTR)"2", (LPCSTR)initfile);
+
+	sprintf_s(tmp, MAX_PATH, "%d", preset);
+	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Preset", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%d", imagetype);
+	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Imagetype", (LPCSTR)tmp, (LPCSTR)initfile);
+
+	// Image adjustment
+	sprintf_s(tmp, MAX_PATH, "%.3f", Brightness);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Brightness", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Contrast);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Contrast", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Saturation);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Saturation", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Gamma);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Gamma", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Temp);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Temp", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Blur);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Blur", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Bloom);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Bloom", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Motion);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Motion", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpness);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Sharpness", (LPCSTR)tmp, (LPCSTR)initfile);
+	sprintf_s(tmp, MAX_PATH, "%.3f", Sharpwidth);
+	WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Sharpwidth", (LPCSTR)tmp, (LPCSTR)initfile);
+	if (bAdaptive)
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Adaptive", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Adaptive", (LPCSTR)"0", (LPCSTR)initfile);
+	if (bFlip)
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Flip", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Flip", (LPCSTR)"0", (LPCSTR)initfile);
+	if (bMirror)
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Mirror", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Mirror", (LPCSTR)"0", (LPCSTR)initfile);
+	if (bSwap)
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Swap", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Adjust", (LPCSTR)"Swap", (LPCSTR)"0", (LPCSTR)initfile);
+
+	// Options
+	if (bShowInfo)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Info", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Info", (LPCSTR)"0", (LPCSTR)initfile);
+
+	if (bTopmost)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Topmost", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Topmost", (LPCSTR)"0", (LPCSTR)initfile);
+
+	//
+	// Receiver sending options
+	//
+
+	// Re-send
+	if (bResend)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resend", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Resend", (LPCSTR)"0", (LPCSTR)initfile);
+
+	WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Receivername", (LPCSTR)g_ReceiverName, (LPCSTR)initfile);
+#endif
+
+	if (bShowLogs)
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Logs", (LPCSTR)"1", (LPCSTR)initfile);
+	else
+		WritePrivateProfileStringA((LPCSTR)"Options", (LPCSTR)"Logs", (LPCSTR)"0", (LPCSTR)initfile);
+
+}
+
+
+//--------------------------------------------------------------
+// Read back settings from configuration file
+void ofApp::ReadInitFile(const char* initfile)
+{
+	char tmp[MAX_PATH]={ 0 };
+
+#ifdef BUILDRECEIVER
+	// Capture options
+	extension = ".png";
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Imagetype", NULL, (LPSTR)tmp, 5, initfile);
+	if (tmp[0]) imagetype = atoi(tmp);
+	extension = imagetypes[imagetype];
+
+	// Recording options
+	bPrompt = false; bShowFile = false; bDuration=false; SecondsDuration=0L;
+	bAudio = false; codec = 1; quality = 1; chroma = 2; preset = 0;
+
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Prompt", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bPrompt = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Showfile", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bShowFile = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Duration", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bDuration = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Seconds", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) SecondsDuration = atol(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Audio", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bAudio = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Codec", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) codec = atoi(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Quality", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) quality = atoi(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Chroma", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) chroma = atoi(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Preset", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) preset = atoi(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Imagetype", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) imagetype = atoi(tmp);
+
+	// Image dajustment
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Brightness", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Brightness = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Contrast", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Contrast = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Saturation", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Saturation = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Gamma", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Gamma = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Temp", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0])Temp = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Blur", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Blur = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Bloom", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Bloom = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Motion", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Motion = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpness", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Sharpness = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Sharpwidth", NULL, (LPSTR)tmp, 8, initfile);
+	if (tmp[0]) Sharpwidth = (float)atof(tmp);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"Adaptive", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bAdaptive = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"bFlip", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bFlip = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"bMirror", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bMirror = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Adjust", (LPSTR)"bSwap", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bSwap = (atoi(tmp) == 1);
+
+	// Menu options
+	bShowInfo = true; bTopmost = false;
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Info", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bShowInfo = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Topmost", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bTopmost = (atoi(tmp) == 1);
+
+	// Receiver sending options
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Resend", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bResend = (atoi(tmp) == 1);
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Receivername", NULL, (LPSTR)tmp, 256, initfile);
+	if (tmp[0]) strcpy_s(g_ReceiverName, 256, tmp);
+
+	// Check menu items
+	if (extension == ".tif") {
+		menu->SetPopupItem("tif", true);
+		menu->SetPopupItem("png", false);
+	}
+	else {
+		menu->SetPopupItem("tif", false);
+		menu->SetPopupItem("png", true);
+	}
+	if (bShowInfo)
+		menu->SetPopupItem("Show info", true);
+	else
+		menu->SetPopupItem("Show info", false);
+
+	// Set topmost or not
+	appMenuFunction("Show on top", bTopmost);
+#endif
+
+	bShowLogs = false;
+	GetPrivateProfileStringA((LPCSTR)"Options", (LPSTR)"Logs", NULL, (LPSTR)tmp, 3, initfile);
+	if (tmp[0]) bShowLogs = (atoi(tmp) == 1);
+	if (bShowLogs) {
+		EnableSpoutLog();
+		menu->SetPopupItem("Enable logs", true);
+		menu->EnablePopupItem("Copy logs", true);
+#ifdef BUILDRECEIVER
+		EnableSpoutLogFile("Spout Demo Receiver.log"); // Log to file
+#else
+		EnableSpoutLogFile("Spout Demo Sender.log"); // Log to file
+#endif
+	}
+	else {
+		DisableSpoutLog();
+		menu->SetPopupItem("Enable logs", false);
+		menu->EnablePopupItem("Copy logs", false);
+	}
+}
+
 
 #ifdef BUILDRECEIVER
 

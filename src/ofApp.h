@@ -67,6 +67,7 @@ class ofApp : public ofBaseApp{
 		bool bFullScreen = false;
 		bool bPreview = false;
 		bool bShowInfo = true;
+		bool bShowLogs = false;
 
 		// These are all for restoring from full screen
 		RECT windowRect{}; // Window rectangle
@@ -97,7 +98,8 @@ class ofApp : public ofBaseApp{
 
 		// Recording
 		spoutRecord recorder;
-		char g_Initfile[MAX_PATH]={0};
+		// LJ DEBUG
+		// char g_Initfile[MAX_PATH]={0};
 		std::string g_FFmpegPath;
 		std::string g_FFmpegCodec;
 		std::string g_OutputFile;
@@ -108,8 +110,9 @@ class ofApp : public ofBaseApp{
 		bool StartRecording(bool prompt = false);
 		void StopRecording();
 		std::string EnterFileName(int type);
-		void WriteInitFile(const char* initfile);
-		void ReadInitFile(const char* initfile);
+		// LJ DEBUG
+		// void WriteInitFile(const char* initfile);
+		// void ReadInitFile(const char* initfile);
 		void SaveImageFile(std::string savepath);
 
 #else
@@ -125,5 +128,9 @@ class ofApp : public ofBaseApp{
 		ofImage skyImage[6]; // Images for skybox cubemap
 #endif
 
+		// Common
+		char g_Initfile[MAX_PATH]{};
+		void ReadInitFile(const char* initfile);
+		void WriteInitFile(const char* initfile);
 
 };
