@@ -17,6 +17,13 @@ The project uses [ofxWinMenu](https://github.com/leadedge/ofxWinMenu) addon and 
 
 Refer to "BUILD.md" for building with either Visual Studio or MSBuild.
 
+## Missing dlls
+
+If you see errors about missing DLL’s, install the [Visual Studio runtime](https://learn.microsoft.com/en-au/cpp/windows/latest-supported-vc-redist). Spout programs are 64-bit, download the X64 version.
+
+
+
+
 
 
 
