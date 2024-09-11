@@ -1212,7 +1212,6 @@ void ofApp::appMenuFunction(std::string title, bool bChecked) {
 		bShowInfo = bChecked;
 	}
 
-	// LJ DEBUG
 	if (title == "Enable logs") {
 		bShowLogs = bChecked;
 		if (bShowLogs) {

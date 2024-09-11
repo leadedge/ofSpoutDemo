@@ -191,11 +191,10 @@ class SPOUT_DLLEXP spoutGL {
 	GLint GLformat(GLuint TextureID, GLuint TextureTarget);
 	// Return OpenGL texture format description
 	std::string GLformatName(GLint glformat = 0);
-
 	// Create an OpenGL window and context for situations where there is none.
 	//   Not used if applications already have an OpenGL context.
 	//   Always call CloseOpenGL afterwards.
-	bool CreateOpenGL();
+	bool CreateOpenGL(HWND hwnd = nullptr);
 	// Close OpenGL window
 	bool CloseOpenGL();
 	// Class initialization status
