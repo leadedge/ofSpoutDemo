@@ -140,6 +140,9 @@
 	17.07.24 - Receiver : if receiving from self, get the next sender in the list
 	16.08.24 - Add Enable logs / Copy logs
 			   Version 1.023
+	11.09.24 - Update VirtualAudiRegister
+			   Version 1.024
+
 
     =========================================================================
     This program is free software: you can redistribute it and/or modify
