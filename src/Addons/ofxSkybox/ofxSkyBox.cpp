@@ -17,6 +17,8 @@
 //
 // 23.11.23 ofxSkyBox  - add loadShaders()
 // 25.11.23 add shader source to ofxSkybox.h and load shaders from string
+// 02.02.25 remove comment before glDisable(GL_DEPTH_TEST)
+//          depth testing enabled in Openframeworks
 //
 
 #include "ofxSkyBox.h"
@@ -53,10 +55,10 @@ void ofxSkyBox::draw() {
 
 	glEnable(GL_TEXTURE_CUBE_MAP_ARB);
 	glDepthFunc(GL_LEQUAL);
-	glEnable(GL_DEPTH_TEST);
+	// glEnable(GL_DEPTH_TEST);
 	
 	cubeshader.begin();
-	//glDisable(GL_DEPTH_TEST);
+	glDisable(GL_DEPTH_TEST);
 	glActiveTexture(GL_TEXTURE0);
 	cubeMap.bind();
 
